@@ -473,9 +473,11 @@ HRESULT PerformAnOperation(BYTE bActionCode)
         // Now release the harness
         SetEvent ( sg_sBrokerObjBusEmulation.m_hActionEvent );
         // Wait until current assignment of broker thread is over
-        WaitForSingleObject ( sg_hNotifyFinish, INFINITE );
-        // Save the result
-        hResult = sg_hResult;
+        if (WaitForSingleObject(sg_hNotifyFinish, 10000) == WAIT_OBJECT_0)
+        {
+            // Save the result
+            hResult = sg_hResult;
+        }
 
         // Work is over, now unlock for others to use common resources
         LeaveCriticalSection ( &sg_CSBroker );
@@ -1011,6 +1013,8 @@ DWORD WINAPI BrokerThreadBusEmulation(LPVOID pVoid)
                                IID_ISimENG, (LPVOID*) &pISimENG);
     if ((S_OK != hResult) || (nullptr == pISimENG))
     {
+        sg_hResult = hResult;
+        SetEvent(sg_hNotifyFinish);
         return 0L;
     }
 

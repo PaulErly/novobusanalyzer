@@ -46,14 +46,14 @@ cmake --build build_modern --config Release
 The build runs the `deploy_runtime` target automatically. It creates a
 self-contained local run folder beside the selected x64 executable, copies the
 BUSMASTER modules, Qt runtime and plugins, and the matching vcpkg DLLs, then
-fails if any deployed DLL is not x64. Do not manually copy DLLs from
+registers the deployed x64 `BusEmulation.exe` COM server for the current user
+and fails if any deployed DLL is not x64. Do not manually copy DLLs from
 `Sources/BUSMASTER/BIN`, because that legacy folder includes x86 vendor DLLs.
 
 The repository does not include the source or an x64 binary for
 `DBManager.dll`; its bundled copy is x86-only and is intentionally excluded.
-The x64 application runs without database import support and shows a warning
-at startup. Install an x64-compatible `DBManager.dll` beside the executable to
-enable database import.
+The x64 application runs without database import support. Install an
+x64-compatible `DBManager.dll` beside the executable to enable database import.
 
 Run the selected configuration directly:
 

@@ -782,9 +782,7 @@ int CMainFrame::OnCreate(LPCREATESTRUCT lpCreateStruct)
 
     OnApplicationLook(ID_VIEW_APPLOOK_OFF_2007_BLUE);
     if (nullptr != m_ouBusmasterNetwork && ( false == m_ouBusmasterNetwork->isDbManagerAvailable())) {
-        MessageBox("Unable to load DBManager.dll. Database import is unavailable.\n"
-                   "The application will continue without database support.",
-                   "Database Manager Unavailable", MB_OK|MB_ICONWARNING);
+        TRACE0("DBManager.dll is unavailable; database import is disabled.\n");
     }
 
     vGetWinStatus(m_WinCurrStatus);
@@ -922,6 +920,7 @@ int CMainFrame::OnCreate(LPCREATESTRUCT lpCreateStruct)
     UpdateWindow();
 	
 	mRibbonBar.ForceRecalcLayout();
+    CSplashScreen::DisplaySplashScreen(this, SW_HIDE);
 	return 0;
 }
 
@@ -8744,8 +8743,11 @@ HRESULT CMainFrame::IntializeDIL(UINT unDefaultChannelCnt, bool bLoadedFromXml)
                     else
                     {
                         theApp.bWriteIntoTraceWnd(_("registering client failed"));
-                        m_dwDriverId = DRIVER_CAN_STUB;          //select simulation
-                        IntializeDIL();
+                        if (m_dwDriverId != DRIVER_CAN_STUB)
+                        {
+                            m_dwDriverId = DRIVER_CAN_STUB;          //select simulation
+                            IntializeDIL();
+                        }
                     }
                 }
                 else
