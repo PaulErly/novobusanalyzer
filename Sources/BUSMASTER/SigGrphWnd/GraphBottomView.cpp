@@ -1267,7 +1267,7 @@ void CGraphBottomView::vEnableDisableButtons(BOOL bConnect)
   Date Created   : 10/12/2004
   Modifications  :
 *******************************************************************************/
-void CGraphBottomView::OnTimer(UINT nIDEvent)
+void CGraphBottomView::OnTimer(UINT_PTR nIDEvent)
 {
     CFormView::OnTimer(nIDEvent);
 }

@@ -297,7 +297,7 @@ static void SaveDeviceData(void)
     }
 }
 
-static BOOL CALLBACK CanSetupDlgProc(HWND hDlg, UINT uMessage, WPARAM wParam, LPARAM /* lParam */)
+static INT_PTR CALLBACK CanSetupDlgProc(HWND hDlg, UINT uMessage, WPARAM wParam, LPARAM /* lParam */)
 {
     int wmId, wmEvent;
 
@@ -417,9 +417,8 @@ int WINAPI ShowCanVsComSetup(HWND hwnd, struct _VSCanCfg* cfg)
     MEMORY_BASIC_INFORMATION mbi;
     static int dummy;
     VirtualQuery(&dummy, &mbi, sizeof(mbi));
-    DWORD hMod = (DWORD)mbi.AllocationBase;
     char szModule[MAX_PATH];
-    GetModuleFileName((HMODULE)hMod, szModule, sizeof(szModule));
+    GetModuleFileName((HMODULE)mbi.AllocationBase, szModule, sizeof(szModule));
     CanCfg = cfg;
     return DialogBox(GetModuleHandle(szModule), MAKEINTRESOURCE(IDD_CONFIG), hwnd, CanSetupDlgProc);
 }

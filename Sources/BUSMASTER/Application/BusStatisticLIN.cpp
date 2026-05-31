@@ -618,7 +618,7 @@ void CBusStatisticLIN::vCalculateBusParametres(void)
         sErrorCounter.m_ucTxErrCount = 0;
 
         // Get the controller status
-        LPARAM lParam = 0;
+        LONG lParam = 0;
 
         if (m_pouDIL_LIN->DILL_GetControllerParams( lParam, nChannelIndex, HW_MODE) == S_OK) {
             m_sBusStatistics_LIN[ nChannelIndex ].m_ucStatus = (UCHAR)lParam;

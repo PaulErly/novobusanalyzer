@@ -121,7 +121,7 @@ void CConfigMsgLogLINDlg::InitialiseWindow()
     m_omComboChannel.ResetContent();
     if (nullptr != pouDilLINInterface)
     {
-        LPARAM lParam = 0;
+        LONG lParam = 0;
         if (S_OK == pouDilLINInterface->DILL_GetControllerParams(lParam, 0, NUMBER_HW))
         {
             m_unChannelCount = (UINT)lParam;

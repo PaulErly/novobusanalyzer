@@ -42,9 +42,14 @@ set_target_properties(${PROJECT_NAME} PROPERTIES LINK_FLAGS "/NODEFAULTLIB:daouu
 #  Advapi32
 #  DataTypes
 #  Utils)
+if(CMAKE_SIZEOF_VOID_P EQUAL 8)
+  set(KVASER_LIBRARY_DIR ${CMAKE_CURRENT_SOURCE_DIR}/EXTERNAL/Lib/x64)
+else()
+  set(KVASER_LIBRARY_DIR ${CMAKE_CURRENT_SOURCE_DIR}/EXTERNAL/Lib/MS)
+endif()
 target_link_libraries(${PROJECT_NAME}
-  ${CMAKE_CURRENT_SOURCE_DIR}/EXTERNAL/Lib/MS/canlib32.lib
-  ${CMAKE_CURRENT_SOURCE_DIR}/EXTERNAL/Lib/MS/linlib.lib
+  ${KVASER_LIBRARY_DIR}/canlib32.lib
+  ${KVASER_LIBRARY_DIR}/linlib.lib
   Advapi32
   DataTypes
   Utils)

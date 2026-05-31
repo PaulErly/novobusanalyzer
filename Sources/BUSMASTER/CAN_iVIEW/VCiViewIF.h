@@ -19,6 +19,7 @@
 
 #include <string>
 #include <map>
+#include <cstdint>
 #include "EXTERNAL\vci.h"
 
 /*
@@ -32,23 +33,7 @@
 #define BASENAME(x) (x)
 #endif
 
-#ifndef _MSC_VER
-#include <stdint.h>
-#else
-/* Use MSVC type names */
-#if defined(_WIN64)
-typedef __int8 int8_t;
-typedef unsigned __int8 uint8_t;
-#else
-typedef signed char int8_t;
-typedef unsigned __int8 uint8_t;
-#endif
-
-typedef unsigned __int16 uint16_t;
-typedef __int16 int16_t;
-
-typedef unsigned __int32 uint32_t;
-typedef __int32 int32_t;
+#ifdef _MSC_VER
 /* define STDIO_FILENO */
 #define STDIN_FILENO    _fileno( stdin )
 #define STDOUT_FILENO   _fileno( stdout )

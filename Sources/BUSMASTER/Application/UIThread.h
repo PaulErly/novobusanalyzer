@@ -52,10 +52,10 @@ protected:
     virtual ~CUIThread();
 
     // To update the window status from the configuration file
-    afx_msg void vUpdateWinStatusFromCfg(UINT, LONG);
+    afx_msg void vUpdateWinStatusFromCfg(WPARAM, LPARAM);
     // To process thread messages
-    afx_msg void vWriteTextToTrace(UINT, LONG);
-    afx_msg void vProcessThreadMsg(UINT, LONG);
+    afx_msg void vWriteTextToTrace(WPARAM, LPARAM);
+    afx_msg void vProcessThreadMsg(WPARAM, LPARAM);
 
     DECLARE_MESSAGE_MAP()
 };

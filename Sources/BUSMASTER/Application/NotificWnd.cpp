@@ -518,7 +518,7 @@ void CNotificWnd::OnDestroy()
     }
 }
 
-void CNotificWnd::OnTimer(UINT nIDEvent)
+void CNotificWnd::OnTimer(UINT_PTR nIDEvent)
 {
     // TODO: Add your message handler code here and/or call default
     if (nIDEvent == m_unTimer)

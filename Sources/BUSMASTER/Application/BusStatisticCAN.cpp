@@ -1023,7 +1023,7 @@ void CBusStatisticCAN::vCalculateBusParametres(void)
         }
 
         // Get the controller status
-        LPARAM lParam = 0;
+        LONG lParam = 0;
 
         if (m_pouDIL_CAN->DILC_GetControllerParams(lParam, nChannelIndex, HW_MODE) == S_OK) {
             m_sBusStatistics[nChannelIndex].m_ucStatus = (UCHAR)lParam;

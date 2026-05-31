@@ -26,6 +26,7 @@
 #include "Utility/UtilFunctions.h"
 
 #include "include/XMLDefines.h"
+#include <libxml/xmlsave.h>
 #include "MainFrm.h"            // Main frame class defintion file
 #include "Properties.h"         // Properties dialog class definition file
 
@@ -2468,7 +2469,7 @@ void CMainFrame::OnSelectMessage()
     // Modification
     SMSGENTRY* psMsgEntry = nullptr;
     vPopulateMsgEntryFromDB(psMsgEntry, theApp.m_pouMsgSignal);
-    LPARAM lParam = 0;
+    LONG lParam = 0;
     if (nullptr != GetICANDIL()) {
         GetICANDIL()->DILC_GetControllerParams(lParam, 0, NUMBER_HW);
     }
@@ -2539,7 +2540,7 @@ void CMainFrame::OnLINFilter()
     // Modification
     /*SMSGENTRY* psMsgEntry = nullptr;
     vPopulateMsgEntryFromDB(psMsgEntry, theApp.m_pouMsgSignal);*/
-    LPARAM lParam = 0;
+    LONG lParam = 0;
     if (nullptr != GetILINDIL()) {
         GetILINDIL()->DILL_GetControllerParams(lParam, 0, NUMBER_HW);
     }
@@ -6456,7 +6457,7 @@ void CMainFrame::OnFilePropeties()
                         Added code to support multi channel in the error counter
                         update procedure
 ******************************************************************************/
-void CMainFrame::OnTimer(UINT nIDEvent)
+void CMainFrame::OnTimer(UINT_PTR nIDEvent)
 {
     if (nIDEvent == m_unTimerSB)
     {
@@ -7078,7 +7079,7 @@ void CMainFrame::OnUpdateTraceWnd(CCmdUI* pCmdUI)
 *******************************************************************************/
 void CMainFrame::OnCfgnUdsMainWnd()
 {
-    LPARAM lParam;
+    LONG lParam;
     GetICANDIL()->DILC_GetControllerParams(lParam, 0, NUMBER_HW);
     (void)DIL_UDS_ShowWnd(this->m_hWnd, lParam);
 }

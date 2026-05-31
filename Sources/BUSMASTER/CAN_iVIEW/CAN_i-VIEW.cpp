@@ -292,7 +292,7 @@ CDIL_CAN_i_VIEW::CDIL_CAN_i_VIEW() :
     m_hOwnerWnd(nullptr),
     m_nChannels(0)
 {
-    m_Channel.assign(nullptr);
+    m_Channel.fill(nullptr);
 }
 
 CDIL_CAN_i_VIEW::~CDIL_CAN_i_VIEW()

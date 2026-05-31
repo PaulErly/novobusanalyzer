@@ -1166,7 +1166,7 @@ void CMsgFrmtWnd::vInit(void* pParam)
   Date Created   : 12-05-2010
   Modifications  :
 *******************************************************************************/
-void CMsgFrmtWnd::OnTimer(UINT nIDEvent)
+void CMsgFrmtWnd::OnTimer(UINT_PTR nIDEvent)
 {
     if (nIDEvent == m_unDispUpdateTimerId)
     {

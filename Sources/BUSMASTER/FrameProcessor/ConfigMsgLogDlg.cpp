@@ -1056,7 +1056,7 @@ void CConfigMsgLogDlg::EnablingAdvSettings(BOOL bEnable)
 }
 // Unpunctual codes
 
-void CConfigMsgLogDlg::OnTimer(UINT nIDEvent)
+void CConfigMsgLogDlg::OnTimer(UINT_PTR nIDEvent)
 {
     if (nIDEvent == m_unDispUpdateTimerId)
     {

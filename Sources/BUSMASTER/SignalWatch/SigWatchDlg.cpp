@@ -685,7 +685,7 @@ case SIGWATCH_WND_PLACEMENT:   // Non - MDI Child
     sPosition.rcNormalPosition = omRect;
 }
 break;*/
-void CSigWatchDlg::OnTimer(UINT nIDEvent)
+void CSigWatchDlg::OnTimer(UINT_PTR nIDEvent)
 {
     // TODO: Add your message handler code here and/or call default
     CDialog::OnTimer(nIDEvent);

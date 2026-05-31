@@ -208,7 +208,7 @@ END_MESSAGE_MAP()
     Modified by      :
     Modification     :
 /*****************************************************************************/
-void CUIThread::vUpdateWinStatusFromCfg(UINT /*unParam*/, LONG lParam)
+void CUIThread::vUpdateWinStatusFromCfg(WPARAM /*unParam*/, LPARAM lParam)
 {
     if (m_podTraceWinObj != nullptr) {
         WINDOWPLACEMENT* pWndCo_ords = (WINDOWPLACEMENT*)lParam;
@@ -254,13 +254,13 @@ BOOL CUIThread::bIsTraceWindowVisible(void)
     return m_podTraceWinObj->IsWindowVisible();
 }
 
-void CUIThread::vWriteTextToTrace(UINT /*unParam*/, LONG lParam)
+void CUIThread::vWriteTextToTrace(WPARAM /*unParam*/, LPARAM lParam)
 {
     CString strText((CHAR*)lParam);
     m_podTraceWinObj->vDisplayString(strText);
 }
 
-void CUIThread::vProcessThreadMsg(UINT unParam, LONG lParam)
+void CUIThread::vProcessThreadMsg(WPARAM unParam, LPARAM lParam)
 {
     switch (unParam) {
         case WM_CLOSE:

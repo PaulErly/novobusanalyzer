@@ -85,11 +85,11 @@ private:
 public:
     afx_msg void OnDestroy(void);
     afx_msg int OnCreate(LPCREATESTRUCT lpCreateStruct);
-    afx_msg HRESULT OnAddTestSetup(WPARAM wparam, LPARAM lparam);
-    afx_msg HRESULT OnDeleteTestSetup(WPARAM wparam, LPARAM lparam);
-    afx_msg HRESULT OnUpdate(WPARAM wparam, LPARAM lparam);
-    afx_msg HRESULT OnExecute(WPARAM wparam, LPARAM lparam);
-    afx_msg HRESULT OnExecutionOver(WPARAM wparam, LPARAM lparam);
+    afx_msg LRESULT OnAddTestSetup(WPARAM wparam, LPARAM lparam);
+    afx_msg LRESULT OnDeleteTestSetup(WPARAM wparam, LPARAM lparam);
+    afx_msg LRESULT OnUpdate(WPARAM wparam, LPARAM lparam);
+    afx_msg LRESULT OnExecute(WPARAM wparam, LPARAM lparam);
+    afx_msg LRESULT OnExecutionOver(WPARAM wparam, LPARAM lparam);
     afx_msg void OnClose();
 };
 

@@ -2664,7 +2664,7 @@ LRESULT CDMGraphCtrl::OnCreate(UINT uMsg, WPARAM wParam, LPARAM lParam, BOOL& bH
     m_ttip.SendMessage(TTM_SETDELAYTIME, TTDT_AUTOPOP, MAKELPARAM(SHRT_MAX, 0));   // stop the tooltip coming up automatically
     m_ttip.SendMessage(TTM_SETDELAYTIME, TTDT_INITIAL, 0);
 
-    ::SetClassLongPtr(m_hWnd, GCL_HCURSOR, (LONG_PTR)LoadCursor(nullptr, IDC_CROSS));
+    ::SetClassLongPtr(m_hWnd, GCLP_HCURSOR, (LONG_PTR)LoadCursor(nullptr, IDC_CROSS));
     return 0;
 }
 

@@ -137,7 +137,7 @@ void CSplashScreen::OnPaint()
     }
 }
 
-void CSplashScreen::OnTimer(UINT /*nIDEvent*/)
+void CSplashScreen::OnTimer(UINT_PTR /*nIDEvent*/)
 {
     DisplaySplashScreen(nullptr, SW_HIDE);
 }

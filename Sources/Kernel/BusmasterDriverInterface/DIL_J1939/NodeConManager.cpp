@@ -1922,7 +1922,7 @@ Modifications  :
 HRESULT CNodeConManager::StartAdresClaimProc(BYTE byAddress) {
   HRESULT hResult = S_FALSE;
   m_byNodeAddress = byAddress;
-  LPARAM lParam;
+  LONG lParam;
   if (CNetworkMgmt::ouGetNWManagementObj()
           .GetICANDIL()
           ->DILC_GetControllerParams(lParam, 0, NUMBER_HW) == S_OK) {
