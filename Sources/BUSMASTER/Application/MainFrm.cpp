@@ -782,8 +782,9 @@ int CMainFrame::OnCreate(LPCREATESTRUCT lpCreateStruct)
 
     OnApplicationLook(ID_VIEW_APPLOOK_OFF_2007_BLUE);
     if (nullptr != m_ouBusmasterNetwork && ( false == m_ouBusmasterNetwork->isDbManagerAvailable())) {
-        MessageBox("Unable to Load Database Manager.\nPlease Reinstall BUSMASTER", "Error", MB_OK|MB_ICONERROR);
-        return -1;
+        MessageBox("Unable to load DBManager.dll. Database import is unavailable.\n"
+                   "The application will continue without database support.",
+                   "Database Manager Unavailable", MB_OK|MB_ICONWARNING);
     }
 
     vGetWinStatus(m_WinCurrStatus);

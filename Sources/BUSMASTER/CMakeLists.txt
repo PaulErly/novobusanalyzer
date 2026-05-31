@@ -155,3 +155,7 @@ add_subdirectory(Utility)
 add_subdirectory(LIN_Kvaser)
 add_subdirectory(LDFEditor)
 add_subdirectory(LDFViewer)
+
+if(WIN32 AND CMAKE_SIZEOF_VOID_P EQUAL 8)
+  include(RuntimeDeployment.cmake)
+endif()
