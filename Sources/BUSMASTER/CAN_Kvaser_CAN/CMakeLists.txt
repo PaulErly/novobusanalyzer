@@ -37,8 +37,13 @@ add_definitions(-D_USRDLL)
 
 # linker options
 set_target_properties(${PROJECT_NAME} PROPERTIES LINK_FLAGS "/NODEFAULTLIB:daouuid")
+if(CMAKE_SIZEOF_VOID_P EQUAL 8)
+  set(KVASER_CAN_LIBRARY ${CMAKE_CURRENT_SOURCE_DIR}/../LIN_Kvaser/EXTERNAL/Lib/x64/canlib32.lib)
+else()
+  set(KVASER_CAN_LIBRARY ${CMAKE_CURRENT_SOURCE_DIR}/EXTERNAL/Lib/MS/canlib32.lib)
+endif()
 target_link_libraries(${PROJECT_NAME}
-  ${CMAKE_CURRENT_SOURCE_DIR}/EXTERNAL/Lib/MS/canlib32.lib
+  ${KVASER_CAN_LIBRARY}
   CommonClass
   DataTypes
   Utils)

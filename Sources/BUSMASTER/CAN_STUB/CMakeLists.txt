@@ -12,7 +12,7 @@ add_library(${PROJECT_NAME} SHARED ${sources} ${headers})
 
 include_directories(
   ..
-  ${CMAKE_BINARY_DIR}/Sources/BUSMASTER/BusEmulation/BusEmulation.dir/${CMAKE_BUILD_TYPE}/ # workaround to find BusEmulation.h
+  ${CMAKE_BINARY_DIR}/Sources/BUSMASTER/BusEmulation/BusEmulation.dir/${CMAKE_CFG_INTDIR}/ # workaround to find BusEmulation.h
   ${ICONV_INCLUDE_DIR}
   ${LIBXML2_INCLUDE_DIR}
   ${ATL_INCLUDE_DIRS}

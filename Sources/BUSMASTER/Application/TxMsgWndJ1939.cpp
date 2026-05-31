@@ -393,7 +393,7 @@ BOOL CTxMsgWndJ1939::OnInitDialog()
 void CTxMsgWndJ1939::OnBnClickedSend()
 {
     UpdateData();
-    LPARAM lParam = 0;
+    LONG lParam = 0;
     GetICANDIL()->DILC_GetControllerParams(lParam, 0, NUMBER_HW);
     UINT unChannel = (UINT) lParam;
     if (m_bNM == TRUE) {
@@ -626,7 +626,7 @@ void CTxMsgWndJ1939::vInitializeTpfFields(void)
     m_omTOEdit.LimitText(2);
 
     //Initialize with default values
-    LPARAM lParam;
+    LONG lParam;
     GetICANDIL()->DILC_GetControllerParams(lParam, 0, NUMBER_HW);
     for (INT_PTR i = 0; i < lParam; i++) {
         CString omChannel;
@@ -676,7 +676,7 @@ void CTxMsgWndJ1939::vUpdateChannelIDInfo()
     m_omComboChannel.ResetContent();
 
     /* Update with latest channel info */
-    LPARAM lParam;
+    LONG lParam;
     GetICANDIL()->DILC_GetControllerParams(lParam, 0, NUMBER_HW);
     for (INT_PTR i = 0; i < lParam; i++) {
         CString omChannel;

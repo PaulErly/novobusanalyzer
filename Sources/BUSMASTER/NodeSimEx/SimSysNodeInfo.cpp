@@ -36,6 +36,7 @@
 #include "ConvertCpp.h"
 //#include "DataTypes/BaseAppServices.h"
 #include "AppServices.h"
+#include <intrin.h>
 
 
 #ifdef _DEBUG
@@ -358,7 +359,7 @@ DWORD WINAPI NodeDataReadThreadProc(LPVOID pVoid)
                     GetSystemInfo(&si);
 
                     // Find SP address
-                    _asm mov lpPage, esp;
+                    lpPage = static_cast<LPBYTE>(_AddressOfReturnAddress());
 
                     // Get allocation base of stack
                     VirtualQuery(lpPage, &mi, sizeof(mi));

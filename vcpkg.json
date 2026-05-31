@@ -1,0 +1,10 @@
+{
+  "name": "novo-busmaster",
+  "version-string": "0.0.1",
+  "dependencies": [
+    "gettext",
+    "libxml2",
+    "zlib"
+  ],
+  "builtin-baseline": "00d899c410b31467733472fc3a83a25729046b13"
+}

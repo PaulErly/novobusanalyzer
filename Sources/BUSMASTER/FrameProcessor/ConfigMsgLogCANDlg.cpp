@@ -118,7 +118,7 @@ void CConfigMsgLogCANDlg::InitialiseWindow()
     m_omComboChannel.ResetContent();
     if (nullptr != pouDilInterface)
     {
-        LPARAM lParam = 0;
+        LONG lParam = 0;
         if (S_OK == pouDilInterface->DILC_GetControllerParams(lParam, 0, NUMBER_HW))
         {
             m_unChannelCount = (UINT)lParam;

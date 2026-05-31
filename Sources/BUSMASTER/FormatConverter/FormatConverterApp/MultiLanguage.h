@@ -67,9 +67,6 @@ Usage:
 #pragma once
 #endif // _MSC_VER > 1000
 
-// LONG_PTR Signed long type for pointer precision.
-// Use when casting a pointer to a long to perform pointer arithmetic.
-typedef signed long LONG_PTR;
 #define     MAX_NUM_LCID    10
 
 class CMultiLanguage

@@ -99,7 +99,7 @@ protected:
     afx_msg void OnBtnLeft();
     afx_msg void OnBtnDown();
     afx_msg void OnBtnRight();
-    afx_msg void OnTimer(UINT nIDEvent);
+    afx_msg void OnTimer(UINT_PTR nIDEvent);
     afx_msg LRESULT vHandleConfigFileChange( WPARAM wParam,LPARAM lParam);
     //}}AFX_MSG
     DECLARE_MESSAGE_MAP()

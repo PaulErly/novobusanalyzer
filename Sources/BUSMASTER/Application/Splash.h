@@ -43,7 +43,7 @@ protected:
 
     afx_msg int OnCreate(LPCREATESTRUCT lpCreateStruct);
     afx_msg void OnPaint();
-    afx_msg void OnTimer(UINT nIDEvent);
+    afx_msg void OnTimer(UINT_PTR nIDEvent);
 };
 
 #endif // BUSMASTER_APPLICATION_SPLASH_H_

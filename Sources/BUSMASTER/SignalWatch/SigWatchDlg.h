@@ -131,5 +131,5 @@ private:
     CCriticalSection m_omCSDispEntry;
     UINT m_unTimerId;
 public:
-    afx_msg void OnTimer(UINT nIDEvent);
+    afx_msg void OnTimer(UINT_PTR nIDEvent);
 };

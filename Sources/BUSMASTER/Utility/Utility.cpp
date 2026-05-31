@@ -30,6 +30,7 @@
 #include <shlwapi.h>
 #include <ShlObj.h>
 #include <cstringt.h>
+#include <intrin.h>
 #include <string>
 #include <sstream>
 #include "Utility.h"
@@ -533,24 +534,7 @@ BOOL bConvertStringToInt64( CString omStrHexNo,
 **************************************************************************/
 __int64 gnGetCpuClocks()
 {
-
-    // Counter
-    struct {
-        int low, high;
-    } counter;
-
-    // Use RDTSC instruction to get clocks count
-    __asm push EAX
-    __asm push EDX
-    __asm __emit 0fh __asm __emit 031h // RDTSC
-    __asm mov counter.low, EAX
-    __asm mov counter.high, EDX
-    __asm pop EDX
-    __asm pop EAX
-
-    // Return result
-    return *(__int64*)(&counter);
-
+    return static_cast<__int64>(__rdtsc());
 }
 
 /* Helper function to calculate how many bytes the signal consumes */

@@ -263,7 +263,7 @@ Date Created   :  07/04/2011
 Modifications  :
 Code Tag       :  CS036
 ******************************************************************************/
-HRESULT CTSExecutorChildFrame::OnAddTestSetup(WPARAM wparam, LPARAM lparam)
+LRESULT CTSExecutorChildFrame::OnAddTestSetup(WPARAM wparam, LPARAM lparam)
 {
     UNREFERENCED_PARAMETER(lparam);
     UNREFERENCED_PARAMETER(wparam);
@@ -380,7 +380,7 @@ Date Created   :  07/04/2011
 Modifications  :
 Code Tag       :  CS037
 ******************************************************************************/
-HRESULT CTSExecutorChildFrame::OnDeleteTestSetup(WPARAM wparam, LPARAM lparam)
+LRESULT CTSExecutorChildFrame::OnDeleteTestSetup(WPARAM wparam, LPARAM lparam)
 {
     UNREFERENCED_PARAMETER(lparam);
     return m_ouTSExecutor.DeleteTestSetup((DWORD)wparam);
@@ -398,7 +398,7 @@ Date Created   :  28/04/2011
 Modifications  :
 Code Tag       :  CS046
 ******************************************************************************/
-HRESULT CTSExecutorChildFrame::OnUpdate(WPARAM wparam, LPARAM lparam)
+LRESULT CTSExecutorChildFrame::OnUpdate(WPARAM wparam, LPARAM lparam)
 {
     UNREFERENCED_PARAMETER(lparam);
     HRESULT hResult = m_ouTSExecutor.Update((DWORD)wparam);
@@ -420,7 +420,7 @@ Date Created   :  07/04/2011
 Modifications  :
 Code Tag       :
 ******************************************************************************/
-HRESULT CTSExecutorChildFrame::OnExecute(WPARAM wparam, LPARAM lparam)
+LRESULT CTSExecutorChildFrame::OnExecute(WPARAM wparam, LPARAM lparam)
 {
     UNREFERENCED_PARAMETER(lparam);
     UNREFERENCED_PARAMETER(wparam);
@@ -442,7 +442,7 @@ Date Created   :  07/04/2011
 Modifications  :
 Code Tag       :
 ******************************************************************************/
-HRESULT CTSExecutorChildFrame::OnExecutionOver(WPARAM wparam, LPARAM lparam)
+LRESULT CTSExecutorChildFrame::OnExecutionOver(WPARAM wparam, LPARAM lparam)
 {
     UNREFERENCED_PARAMETER(lparam);
     UNREFERENCED_PARAMETER(wparam);

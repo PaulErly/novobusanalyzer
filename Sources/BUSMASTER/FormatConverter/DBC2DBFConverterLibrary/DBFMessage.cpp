@@ -23,6 +23,7 @@
  */
 
 /* Project includes */
+#include "DBC2DBFConverterLibrary_stdafx.h"
 #include "DBFConverter.h"
 #include "DBFMessage.h"
 #include "DBFTagDefinitions.h"

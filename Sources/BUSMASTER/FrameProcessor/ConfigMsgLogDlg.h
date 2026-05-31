@@ -180,7 +180,7 @@ protected:
     afx_msg void OnBnClickedLogOnTime(void);
     virtual BOOL OnCommand(WPARAM wParam, LPARAM lParam);
 public:
-    afx_msg void OnTimer(UINT nIDEvent);
+    afx_msg void OnTimer(UINT_PTR nIDEvent);
 
     afx_msg void OnEnChngLogFileSize();
     afx_msg void OnEnChngLogFileTimeHrs();

@@ -213,7 +213,7 @@ public:
     afx_msg LRESULT vUpdateFormattedMsgStruct(WPARAM wParam, LPARAM lParam);
     afx_msg LRESULT vSortMsgWndColumn(WPARAM wParam, LPARAM lParam);
     afx_msg LRESULT vUpdateMsgClr(WPARAM wParam, LPARAM lParam);
-    afx_msg void OnTimer(UINT nIDEvent);
+    afx_msg void OnTimer(UINT_PTR nIDEvent);
     afx_msg LRESULT ModifyMsgWndProperty(WPARAM wParam, LPARAM lParam);
     afx_msg LRESULT OnDisplaySettingUpdated(WPARAM wParam, LPARAM lParam);
 

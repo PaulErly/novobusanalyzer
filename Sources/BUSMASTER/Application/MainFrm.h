@@ -403,7 +403,7 @@ protected:
     afx_msg void OnFilePropeties();
     afx_msg void OnDropFiles(HDROP hDropInfo);
     afx_msg void OnUpdateConfigureModeActive(CCmdUI* pCmdUI);
-    afx_msg void OnTimer(UINT nIDEvent);
+    afx_msg void OnTimer(UINT_PTR nIDEvent);
     afx_msg void OnNetworkStatisticsWnd();
     afx_msg void OnUpdateNetworkStatisticsWnd(CCmdUI* pCmdUI);
 
