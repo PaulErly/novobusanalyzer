@@ -293,21 +293,25 @@ HINSTANCE CMultiLanguage::LoadLangResourceDLL(LPCTSTR szModuleName, LANGID langU
 
         if ( nNoExtension + 3 + 4 + 1 < _MAX_PATH+14 )
         {
-            // append "ENU.DLL" to moduleName
+            // Keep the legacy behavior of probing for a sibling resource DLL,
+            // but do not treat failure as fatal at startup. Some modern build
+            // layouts do not ship language-specific resource DLLs alongside the
+            // helper executable.
             lstrcpyn(szResDLLName, szModuleName, nNoExtension);
             lstrcat(szResDLLName, szLangCode);
             lstrcat(szResDLLName, _T(".DLL"));
         }
         else
         {
-            ASSERT(FALSE);  // No enough space to hold language resource dll name path.
-            return NULL;
+            TRACE0("Format Converter language resource DLL path is too long.\n");
+            continue;
         }
         hLangDLL = ::LoadLibrary(szResDLLName);
         if(hLangDLL != NULL)
         {
             return hLangDLL;    // Successful return
         }
+        TRACE1("Format Converter did not load language resource DLL %s\n", szResDLLName);
     }
 
     return hLangDLL;

@@ -29,14 +29,30 @@ CDefConverterPage::~CDefConverterPage()
 void CDefConverterPage::DoDataExchange(CDataExchange* pDX)
 {
     CPropertyPage::DoDataExchange(pDX);
-    DDX_Control(pDX, IDC_COMBO_CONVERSIONS, m_omComboConverterNames);
-    DDX_Control(pDX, IDC_EDIT_INPUTFILEPATH, m_omEditInputPath);
-    DDX_Control(pDX, IDC_EDIT_OUTPUTFILEPATH, m_omEditOutputPath);
-    DDX_Text(pDX, IDC_EDIT_INPUTFILEPATH, m_omStrInputFilePath);
-    DDX_Text(pDX, IDC_EDIT_OUTPUTFILEPATH, m_omStrOutputFilePath);
-    DDX_Text(pDX, IDC_EDIT_COMMENT, m_omstrConversionComment);
-    DDX_Text(pDX, IDC_EDIT_HELP, m_omstrEditHelp);
-    DDV_MaxChars(pDX, m_omstrEditHelp, 1024);
+    const HWND hDlg = (pDX->m_pDlgWnd != nullptr) ? pDX->m_pDlgWnd->GetSafeHwnd() : nullptr;
+    if (hDlg != nullptr && ::GetDlgItem(hDlg, IDC_COMBO_CONVERSIONS) != nullptr)
+    {
+        DDX_Control(pDX, IDC_COMBO_CONVERSIONS, m_omComboConverterNames);
+    }
+    if (hDlg != nullptr && ::GetDlgItem(hDlg, IDC_EDIT_INPUTFILEPATH) != nullptr)
+    {
+        DDX_Control(pDX, IDC_EDIT_INPUTFILEPATH, m_omEditInputPath);
+        DDX_Text(pDX, IDC_EDIT_INPUTFILEPATH, m_omStrInputFilePath);
+    }
+    if (hDlg != nullptr && ::GetDlgItem(hDlg, IDC_EDIT_OUTPUTFILEPATH) != nullptr)
+    {
+        DDX_Control(pDX, IDC_EDIT_OUTPUTFILEPATH, m_omEditOutputPath);
+        DDX_Text(pDX, IDC_EDIT_OUTPUTFILEPATH, m_omStrOutputFilePath);
+    }
+    if (hDlg != nullptr && ::GetDlgItem(hDlg, IDC_EDIT_COMMENT) != nullptr)
+    {
+        DDX_Text(pDX, IDC_EDIT_COMMENT, m_omstrConversionComment);
+    }
+    if (hDlg != nullptr && ::GetDlgItem(hDlg, IDC_EDIT_HELP) != nullptr)
+    {
+        DDX_Text(pDX, IDC_EDIT_HELP, m_omstrEditHelp);
+        DDV_MaxChars(pDX, m_omstrEditHelp, 1024);
+    }
 }
 
 
@@ -125,11 +141,24 @@ BOOL CDefConverterPage::OnInitDialog()
 {
     CPropertyPage::OnInitDialog();
     // TODO:  Add extra initialization here
-    LoadConverters();
-    m_omComboConverterNames.SetCurSel(0);
-    OnCbnSelchangeComboConversions();
+    const HRESULT loadResult = LoadConverters();
+    if ((loadResult == S_OK) && (m_omComboConverterNames.GetCount() > 0))
+    {
+        m_omComboConverterNames.SetCurSel(0);
+        OnCbnSelchangeComboConversions();
+    }
+    else
+    {
+        TRACE0("Format Converter started without any loadable converter plugins.\n");
+        if (CWnd* pWnd = GetDlgItem(IDC_BTN_INPUT)) { pWnd->EnableWindow(FALSE); }
+        if (CWnd* pWnd = GetDlgItem(IDC_BTN_OUTPUT)) { pWnd->EnableWindow(FALSE); }
+        if (CWnd* pWnd = GetDlgItem(IDC_BTN_CONVERT)) { pWnd->EnableWindow(FALSE); }
+        if (CWnd* pWnd = GetDlgItem(IDC_BUTTON_VIEW_LOG)) { pWnd->EnableWindow(FALSE); }
+        m_omstrEditHelp = _("No converter plugins were loaded from the runtime folder.");
+        UpdateData(FALSE);
+    }
 
-    GetDlgItem(IDC_BUTTON_VIEW_LOG)->EnableWindow(FALSE);
+    if (CWnd* pWnd = GetDlgItem(IDC_BUTTON_VIEW_LOG)) { pWnd->EnableWindow(FALSE); }
     return TRUE;  // return TRUE unless you set the focus to a control
 }
 

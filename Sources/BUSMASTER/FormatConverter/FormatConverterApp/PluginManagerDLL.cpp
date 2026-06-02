@@ -6,6 +6,41 @@
 
 // CPluginManagerDLL
 
+namespace
+{
+    bool IsX64ModuleFile(const CString& path)
+    {
+        CFile file;
+        if (!file.Open(path, CFile::modeRead | CFile::shareDenyNone))
+        {
+            return false;
+        }
+
+        const ULONGLONG length = static_cast<ULONGLONG>(file.GetLength());
+        if (length < 0x100)
+        {
+            return false;
+        }
+
+        CByteArray buffer;
+        buffer.SetSize(static_cast<int>(length));
+        if (file.Read(buffer.GetData(), static_cast<UINT>(length)) != length)
+        {
+            return false;
+        }
+
+        const BYTE* bytes = buffer.GetData();
+        const DWORD peOffset = *reinterpret_cast<const DWORD*>(bytes + 0x3C);
+        if (peOffset + 6 >= length)
+        {
+            return false;
+        }
+
+        const WORD machine = *reinterpret_cast<const WORD*>(bytes + peOffset + 4);
+        return machine == IMAGE_FILE_MACHINE_AMD64;
+    }
+}
+
 typedef HRESULT (*GETCONVERTERINTERFACE)(CBaseConverter*&);
 
 CPluginManagerDLL::CPluginManagerDLL()
@@ -60,6 +95,11 @@ HRESULT CPluginManagerDLL::LoadConvertersFromFolder(CONST TCHAR* pchPluginFolder
 HRESULT CPluginManagerDLL::LoadConverter(CString& strFileName)
 {
     ConverterInfo ConverterInfo;
+    if (!IsX64ModuleFile(strFileName))
+    {
+        TRACE1("Skipping non-x64 converter plugin %s\n", strFileName);
+        return S_FALSE;
+    }
     ConverterInfo.m_hModule = LoadLibrary(strFileName);
     if ( !ConverterInfo.m_hModule )
     {

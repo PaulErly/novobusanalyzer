@@ -40,6 +40,14 @@ END_MESSAGE_MAP()
 BOOL CScheduleTableCfgDlg::OnInitDialog()
 {
     CDialog::OnInitDialog();
+    m_bControlsReady = false;
+
+    if (m_ouClusterConfig == nullptr)
+    {
+        TRACE0("LIN schedule configuration dialog has no cluster configuration.\n");
+        AfxMessageBox(_("Unable to create the LIN schedule configuration window."), MB_ICONSTOP | MB_OK);
+        return FALSE;
+    }
 
     // use the initial dialog size as the default minimum
     if ((m_AllowedSize.cx == 0) && (m_AllowedSize.cy == 0))
@@ -54,36 +62,48 @@ BOOL CScheduleTableCfgDlg::OnInitDialog()
 
     CRect rcTreeWnd;
     CWnd* pPlaceholderWnd = GetDlgItem(IDC_TREE_LIN_SCHEDULE);
+    if (pPlaceholderWnd == nullptr)
+    {
+        TRACE0("Schedule configuration dialog template is missing IDC_TREE_LIN_SCHEDULE.\n");
+        AfxMessageBox(_("Unable to create the LIN schedule configuration window."), MB_ICONSTOP | MB_OK);
+        return FALSE;
+    }
     pPlaceholderWnd->GetWindowRect(&rcTreeWnd);
     ScreenToClient(&rcTreeWnd);
 
     pPlaceholderWnd->DestroyWindow();
     // create the multi-column tree window
-    m_TreeWnd.CreateEx(WS_EX_CLIENTEDGE, NULL, NULL, WS_CHILD | WS_VISIBLE,
-                       rcTreeWnd, this, IDC_TREE_LIN_SCHEDULE);
-    CRect rect;
-    m_TreeWnd.GetTreeCtrl().GetWindowRect(&rect);
-    m_ouCheckTreeCtrl.Create(WS_CHILD | WS_VISIBLE | TVS_NOHSCROLL | TVS_NOTOOLTIPS,  rect, this, 1);
-    m_ouCheckTreeCtrl.SubclassWindow(m_TreeWnd.GetTreeCtrl().GetSafeHwnd());
-
-    DWORD dwStyle = GetWindowLong(m_ouCheckTreeCtrl, GWL_STYLE);
-    dwStyle |= TVS_HASBUTTONS | TVS_HASLINES | TVS_LINESATROOT | TVS_FULLROWSELECT | TVS_DISABLEDRAGDROP;
-    SetWindowLong(m_ouCheckTreeCtrl, GWL_STYLE, dwStyle);
-    /* Remove the style */
-    m_ouCheckTreeCtrl.ModifyStyle( TVS_CHECKBOXES, 0 );
-    /* Now explicitly set it */
-    m_ouCheckTreeCtrl.ModifyStyle( 0, TVS_CHECKBOXES );
-
-    if( NULL == m_ouCheckTreeCtrl )
+    if (m_TreeWnd.CreateEx(WS_EX_CLIENTEDGE, NULL, NULL, WS_CHILD | WS_VISIBLE,
+                       rcTreeWnd, this, IDC_TREE_LIN_SCHEDULE) == FALSE)
     {
+        TRACE0("Failed to create the schedule configuration tree window.\n");
+        AfxMessageBox(_("Unable to create the LIN schedule configuration window."), MB_ICONSTOP | MB_OK);
         return FALSE;
     }
+    CRect rect = rcTreeWnd;
+    CCheckColumnTreeCtrl& checkTree = m_TreeWnd.GetCheckTreeCtrl();
+    if (checkTree.GetSafeHwnd() == nullptr)
+    {
+        TRACE0("Failed to create the schedule configuration tree control.\n");
+        AfxMessageBox(_("Unable to create the LIN schedule configuration window."), MB_ICONSTOP | MB_OK);
+        return FALSE;
+    }
+
+    DWORD dwStyle = GetWindowLong(checkTree, GWL_STYLE);
+    dwStyle |= TVS_HASBUTTONS | TVS_HASLINES | TVS_LINESATROOT | TVS_FULLROWSELECT | TVS_DISABLEDRAGDROP;
+    SetWindowLong(checkTree, GWL_STYLE, dwStyle);
+    /* Remove the style */
+    checkTree.ModifyStyle( TVS_CHECKBOXES, 0 );
+    /* Now explicitly set it */
+    checkTree.ModifyStyle( 0, TVS_CHECKBOXES );
+
+    m_bControlsReady = true;
 
     // 1. Set tree column headers
     vSetColumnHeaders();
 
-    m_ouCheckTreeCtrl.nUpdateScheduleView();
-    m_ouCheckTreeCtrl.Expand(m_ouCheckTreeCtrl.GetRootItem(), TVM_EXPAND);
+    checkTree.nUpdateScheduleView();
+    checkTree.Expand(checkTree.GetRootItem(), TVM_EXPAND);
 
     // keep the initial size of the client area as a baseline for moving/sizing controls
     CRect rcClient;
@@ -91,6 +111,7 @@ BOOL CScheduleTableCfgDlg::OnInitDialog()
     m_DefaultSize = rcClient.Size();
     vMoveWindowPos(IDC_TREE_LIN_SCHEDULE, 0, 0, 100.0, 100.0);
     vMoveWindowPos(IDCLOSE, 100.0, 100.0, 0.0, 0.0);
+    vAdjustColumns();
     return TRUE;
 }
 
@@ -101,6 +122,10 @@ void CScheduleTableCfgDlg::OnLButtonDown(UINT nFlags, CPoint point)
 
 void CScheduleTableCfgDlg::vAdjustColumns()
 {
+    if (m_TreeWnd.GetTreeCtrl().GetSafeHwnd() == nullptr)
+    {
+        return;
+    }
 
     HDITEM hditem;
     CHeaderCtrl& header = m_TreeWnd.GetHeaderCtrl();
@@ -135,6 +160,10 @@ void CScheduleTableCfgDlg::vAdjustColumns()
 
 void CScheduleTableCfgDlg::vSetColumnHeaders()
 {
+    if (m_TreeWnd.GetTreeCtrl().GetSafeHwnd() == nullptr)
+    {
+        return;
+    }
     CHeaderCtrl& header = m_TreeWnd.GetHeaderCtrl();
 
     HDITEM hditem;
@@ -198,6 +227,10 @@ void CScheduleTableCfgDlg::vGetAutoResizeValues(double fSizeX, double fSizeY,dou
 
 void CScheduleTableCfgDlg::vMoveWindowPos(int nResourceId, double fToXPos, double fToYPos, double fSizeX, double fSizeY)
 {
+    if (!m_bControlsReady)
+    {
+        return;
+    }
     double dStandard = 100.0;
     _AUTORESIZE autoResize;
     GetDlgItem(nResourceId, &autoResize.wndHandle);
@@ -269,6 +302,10 @@ HDWP CScheduleTableCfgDlg::vUpdateWindowPosition(int nXPos, int nYPos)
 void CScheduleTableCfgDlg::OnSize(UINT nType, int cx, int cy)
 {
     CDialog::OnSize(nType, cx, cy);
+    if (!m_bControlsReady)
+    {
+        return;
+    }
 
     int nXPos = cx - m_DefaultSize.cx;
     int nYPos = cy - m_DefaultSize.cy;
@@ -303,6 +340,6 @@ void CScheduleTableCfgDlg::OnClose()
 
 void CScheduleTableCfgDlg::nUpdateScheduleView()
 {
-    m_ouCheckTreeCtrl.nUpdateScheduleView();
+    m_TreeWnd.GetCheckTreeCtrl().nUpdateScheduleView();
 }
 

@@ -54,8 +54,19 @@ CTestAutomationEditorApp theApp;
 
 BOOL CTestAutomationEditorApp::InitInstance()
 {
-	InitCommonControls();    // initialize common control library
-	CWinAppEx::InitInstance(); // call parent class method
+    InitCommonControls();    // initialize common control library
+    CWinAppEx::InitInstance(); // call parent class method
+    TCHAR szPath[MAX_PATH] = {};
+    if (GetModuleFileName(nullptr, szPath, MAX_PATH) != 0)
+    {
+        PathRemoveFileSpec(szPath);
+        const CString helpPath = CString(szPath) + _T("\\BUSMASTER.chm");
+        m_pszHelpFilePath = _tcsdup(helpPath);
+    }
+    else
+    {
+        m_pszHelpFilePath = _tcsdup(_T("BUSMASTER.chm"));
+    }
 
 	// Initialize OLE libraries
 	if (!AfxOleInit())

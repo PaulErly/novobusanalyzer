@@ -10,6 +10,9 @@ AccessDBManager::AccessDBManager() {
 bool AccessDBManager::isDbManagerAvailable() { return mDbManagerAvailable; }
 HRESULT AccessDBManager::LoadDbManager() {
   ReleaseDbmanager();
+#if defined(_WIN64)
+  return HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED);
+#else
   mDllHandle = LoadLibrary("DBManager.dll");
   if (nullptr == mDllHandle) {
     return S_FALSE;
@@ -26,14 +29,16 @@ HRESULT AccessDBManager::LoadDbManager() {
   }
   mDbManagerAvailable = true;
   return S_OK;
+#endif
 }
 
 void AccessDBManager::ReleaseDbmanager() {
-  if (nullptr == mDllHandle) {
+  if (nullptr != mDllHandle) {
     FreeLibrary(mDllHandle);
     mDllHandle = nullptr;
-    mParseDbFile = nullptr;
   }
+  mParseDbFile = nullptr;
+  mFreeCluster = nullptr;
   mDbManagerAvailable = false;
 }
 

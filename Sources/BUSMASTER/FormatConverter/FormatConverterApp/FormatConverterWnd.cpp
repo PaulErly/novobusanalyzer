@@ -6,6 +6,27 @@
 #include "DefConverterPage.h"
 #include <HtmlHelp.h>
 #include <locale.h>
+
+namespace
+{
+    class CScopedResourceHandle
+    {
+    public:
+        explicit CScopedResourceHandle(HINSTANCE hNewResource)
+            : m_hOldResource(AfxGetResourceHandle())
+        {
+            AfxSetResourceHandle(hNewResource);
+        }
+
+        ~CScopedResourceHandle()
+        {
+            AfxSetResourceHandle(m_hOldResource);
+        }
+
+    private:
+        HINSTANCE m_hOldResource;
+    };
+}
 // CFormatConverterWnd
 
 IMPLEMENT_DYNAMIC(CFormatConverterWnd, CPropertySheet)
@@ -44,6 +65,7 @@ void CFormatConverterWnd::vGettextBusmaster(void)
 
 BEGIN_MESSAGE_MAP(CFormatConverterWnd, CPropertySheet)
     ON_WM_CREATE()
+    ON_WM_SHOWWINDOW()
     ON_COMMAND ( ID_HELP, &CFormatConverterWnd::OnHelp )
 END_MESSAGE_MAP()
 
@@ -52,6 +74,7 @@ END_MESSAGE_MAP()
 
 BOOL CFormatConverterWnd::OnInitDialog()
 {
+    CScopedResourceHandle resourceScope(AfxGetInstanceHandle());
     BOOL bResult = CPropertySheet::OnInitDialog();
 
     SetIcon( AfxGetApp()->LoadIcon(IDR_MAINFRAME), TRUE);
@@ -64,18 +87,53 @@ BOOL CFormatConverterWnd::OnInitDialog()
     vGettextBusmaster();
 
     omBtn = reinterpret_cast<CButton*>(GetDlgItem(ID_APPLY_NOW));
-    omBtn->ShowWindow(SW_HIDE);
-    omBtn->GetWindowPlacement(&omWndPlace);
+    if (omBtn != nullptr)
+    {
+        omBtn->ShowWindow(SW_HIDE);
+        omBtn->GetWindowPlacement(&omWndPlace);
+    }
 
     omBtn = reinterpret_cast<CButton*>(GetDlgItem(IDOK));
-    omBtn->ShowWindow(SW_HIDE);
+    if (omBtn != nullptr)
+    {
+        omBtn->ShowWindow(SW_HIDE);
+    }
 
 
 
     omBtn = reinterpret_cast<CButton*>(GetDlgItem(IDCANCEL));
-    omBtn->SetWindowText(_("Close"));
-    omBtn->SetWindowPlacement(&omWndPlace);
+    if (omBtn != nullptr)
+    {
+        omBtn->SetWindowText(_("Close"));
+        omBtn->SetWindowPlacement(&omWndPlace);
+    }
+    else
+    {
+        TRACE0("Format Converter dialog template is missing IDCANCEL.\n");
+    }
+
+    if (!m_bConvertersLoaded)
+    {
+        TRACE0("Format Converter will load converter tabs after the window is shown.\n");
+    }
     return bResult;
+}
+
+void CFormatConverterWnd::OnShowWindow(BOOL bShow, UINT nStatus)
+{
+    CPropertySheet::OnShowWindow(bShow, nStatus);
+    if (bShow && !m_bConvertersLoaded)
+    {
+        m_bConvertersLoaded = (LoadConverters() == S_OK);
+        if (m_bConvertersLoaded)
+        {
+            TRACE0("Format Converter tabs loaded after the window became visible.\n");
+        }
+        else
+        {
+            TRACE0("Format Converter did not load any converter tabs.\n");
+        }
+    }
 }
 
 int CFormatConverterWnd::OnCreate(LPCREATESTRUCT lpCreateStruct)
@@ -92,20 +150,21 @@ int CFormatConverterWnd::OnCreate(LPCREATESTRUCT lpCreateStruct)
 
 void CFormatConverterWnd::OnHelp ()
 {
-    // Get Application Help File Path
-    CString omStrPath = AfxGetApp ()->m_pszHelpFilePath;
+    TCHAR szPath[MAX_PATH] = {};
+    if (GetModuleFileName(nullptr, szPath, MAX_PATH) == 0)
+    {
+        AfxMessageBox(_("Failed to launch help."), MB_ICONWARNING | MB_OK);
+        return;
+    }
 
-    // Replace .hlp with .chm
-    int nIndex = omStrPath.ReverseFind ('.');
-    // Extract string before the extension
-    omStrPath = omStrPath.Mid ( 0, nIndex );
-    // Add New Extension
-    omStrPath = omStrPath + ".chm" + "::/topics/format_converters.html";
-
-    omStrPath.Replace ( "FormatConverter.chm", "BUSMASTER.chm" );
+    PathRemoveFileSpec(szPath);
+    CString omStrPath = CString(szPath) + _T("\\BUSMASTER.chm::/topics/format_converters.html");
     
     // Make it as content display always
-    ::HtmlHelp ( nullptr, omStrPath, HH_DISPLAY_TOPIC, 0 );
+    if (::HtmlHelp(nullptr, omStrPath, HH_DISPLAY_TOPIC, 0) == nullptr)
+    {
+        AfxMessageBox(_("Failed to launch help."), MB_ICONWARNING | MB_OK);
+    }
 }
 
 BOOL CFormatConverterWnd::Create(CWnd* pParentWnd , DWORD dwStyle , DWORD dwExStyle)
@@ -121,6 +180,11 @@ BOOL CFormatConverterWnd::Create(CWnd* pParentWnd , DWORD dwStyle , DWORD dwExSt
 
 HRESULT CFormatConverterWnd::LoadConverters()
 {
+    CScopedResourceHandle resourceScope(AfxGetInstanceHandle());
+    if (m_bConvertersLoaded)
+    {
+        return S_OK;
+    }
     m_pouPluginManager = new CPluginManagerDLL();
     m_pouPluginManager->LoadConvertersFromFolder();
 
@@ -148,6 +212,9 @@ HRESULT CFormatConverterWnd::LoadConverters()
     m_pomDefConverterPage->SetPluginManager(m_pouPluginManager);
     m_pomDefConverterPage->m_psp.dwFlags &= ~PSP_HASHELP;
     AddPage(m_pomDefConverterPage);
+
+    TRACE1("Format Converter loaded %d converter tabs.\n", nCount);
+    m_bConvertersLoaded = true;
 
     return S_OK;
 

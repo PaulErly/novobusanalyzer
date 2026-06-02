@@ -56,11 +56,11 @@ int CColumnTreeWnd::OnCreate(LPCREATESTRUCT lpCreateStruct)
     }
 
     // create tree and header controls as children
-    m_Tree.Create(WS_CHILD | WS_VISIBLE | TVS_NOHSCROLL | TVS_NOTOOLTIPS, CRect(), this, TreeID);
+    m_CheckTree.Create(WS_CHILD | WS_VISIBLE | TVS_NOHSCROLL | TVS_NOTOOLTIPS, CRect(), this, TreeID);
     m_Header.Create(WS_CHILD | WS_VISIBLE | HDS_FULLDRAG, CRect(), this, HeaderID);
 
     // set correct font for the header
-    CFont* pFont = m_Tree.GetFont();
+    CFont* pFont = m_CheckTree.GetFont();
     m_Header.SetFont(pFont);
 
     // check if the common controls library version 6.0 is available
@@ -173,7 +173,7 @@ void CColumnTreeWnd::OnHeaderItemChanged(NMHDR* /* pNMHDR */, LRESULT* /* pResul
 {
     UpdateColumns();
 
-    m_Tree.Invalidate();
+    m_CheckTree.Invalidate();
 }
 
 void CColumnTreeWnd::OnHeaderDividerDblClick(NMHDR* pNMHDR, LRESULT* /* pResult */)
@@ -212,7 +212,7 @@ void CColumnTreeWnd::OnTreeCustomDraw(NMHDR* pNMHDR, LRESULT* pResult)
             dc.Attach(pNMCustomDraw->hdc);
 
             CRect rcLabel;
-            m_Tree.GetItemRect(hItem, &rcLabel, TRUE);
+            m_CheckTree.GetItemRect(hItem, &rcLabel, TRUE);
 
             COLORREF crTextBk = pNMTVCustomDraw->clrTextBk;
             COLORREF crText = pNMTVCustomDraw->clrText;
@@ -237,7 +237,7 @@ void CColumnTreeWnd::OnTreeCustomDraw(NMHDR* pNMHDR, LRESULT* pResult)
             // ...and the vertical ones
             dc.DrawEdge(&rcItem, BDR_SUNKENINNER, BF_BOTTOM);
 
-            CString strText = m_Tree.GetItemText(hItem);
+            CString strText = m_CheckTree.GetItemText(hItem);
             CString strSub;
             AfxExtractSubString(strSub, strText, 0, '\t');
 
@@ -247,7 +247,7 @@ void CColumnTreeWnd::OnTreeCustomDraw(NMHDR* pNMHDR, LRESULT* pResult)
             rcLabel.right = min(rcLabel.left + rcText.right + 4, m_arrColWidths[0] - 4);
 
             CRect rcBack = rcLabel;
-            if (GetWindowLong(m_Tree.m_hWnd, GWL_STYLE) & TVS_FULLROWSELECT) {
+            if (GetWindowLong(m_CheckTree.m_hWnd, GWL_STYLE) & TVS_FULLROWSELECT) {
                 int nWidth = 0;
                 for (int i=0; i < nColsCnt; i++) {
                     nWidth += m_arrColWidths[i];
@@ -280,7 +280,7 @@ void CColumnTreeWnd::OnTreeCustomDraw(NMHDR* pNMHDR, LRESULT* pResult)
             xOffset = m_arrColWidths[0];
             dc.SetBkMode(TRANSPARENT);
 
-            if (!(GetWindowLong(m_Tree.m_hWnd, GWL_STYLE) & TVS_FULLROWSELECT)) {
+            if (!(GetWindowLong(m_CheckTree.m_hWnd, GWL_STYLE) & TVS_FULLROWSELECT)) {
                 dc.SetTextColor(GetSysColor(COLOR_WINDOWTEXT));
             }
 
@@ -323,11 +323,11 @@ void CColumnTreeWnd::UpdateColumns()
         if (m_Header.GetItem(i, &hditem)) {
             m_cxTotal += m_arrColWidths[i] = hditem.cxy;
             if (i == 0) {
-                m_Tree.m_cxFirstCol = hditem.cxy;
+                m_CheckTree.m_cxFirstCol = hditem.cxy;
             }
         }
     }
-    m_Tree.m_cxTotal = m_cxTotal;
+    m_CheckTree.m_cxTotal = m_cxTotal;
 
     UpdateScroller();
     RepositionControls();
@@ -361,7 +361,7 @@ void CColumnTreeWnd::UpdateScroller()
 void CColumnTreeWnd::RepositionControls()
 {
     // reposition child controls
-    if (m_Tree.m_hWnd) {
+    if (m_CheckTree.m_hWnd) {
         CRect rcClient;
         GetClientRect(&rcClient);
         int cx = rcClient.Width();
@@ -374,7 +374,7 @@ void CColumnTreeWnd::RepositionControls()
             cx += x;
         }
         m_Header.MoveWindow(-x, 0, cx, m_cyHeader);
-        m_Tree.MoveWindow(-x, m_cyHeader, cx, cy-m_cyHeader);
+        m_CheckTree.MoveWindow(-x, m_cyHeader, cx, cy-m_cyHeader);
     }
 }
 
@@ -396,7 +396,7 @@ BOOL CColumnTreeWnd::OnNotify(WPARAM wParam, LPARAM lParam, LRESULT* pResult)
 
 void CColumnTreeWnd::AdjustColumnWidth(int nColumn, BOOL bIgnoreCollapsed)
 {
-    int nMaxWidth = GetMaxColumnWidth(m_Tree.GetRootItem(), nColumn, 0, bIgnoreCollapsed);
+    int nMaxWidth = GetMaxColumnWidth(m_CheckTree.GetRootItem(), nColumn, 0, bIgnoreCollapsed);
 
     HDITEM hditem;
     hditem.mask = HDI_WIDTH;
@@ -409,12 +409,12 @@ int CColumnTreeWnd::GetMaxColumnWidth(HTREEITEM hItem, int nColumn, int nDepth, 
 {
     int nMaxWidth = 0;
 
-    CString strText = m_Tree.GetItemText(hItem);
+    CString strText = m_CheckTree.GetItemText(hItem);
     CString strSub;
     if (AfxExtractSubString(strSub, strText, nColumn, '\t')) {
         CDC dc;
         dc.CreateCompatibleDC(NULL);
-        CFont* pOldFont = dc.SelectObject(m_Tree.GetFont());
+        CFont* pOldFont = dc.SelectObject(m_CheckTree.GetFont());
 
         // calculate text width
         nMaxWidth = dc.GetTextExtent(strSub).cx;
@@ -426,29 +426,29 @@ int CColumnTreeWnd::GetMaxColumnWidth(HTREEITEM hItem, int nColumn, int nDepth, 
     if (nColumn == 0) {
         int nIndent = nDepth;
 
-        if (GetWindowLong(m_Tree.m_hWnd, GWL_STYLE) & TVS_LINESATROOT) {
+        if (GetWindowLong(m_CheckTree.m_hWnd, GWL_STYLE) & TVS_LINESATROOT) {
             nIndent++;
         }
 
         int nImage, nSelImage;
-        m_Tree.GetItemImage(hItem, nImage, nSelImage);
+        m_CheckTree.GetItemImage(hItem, nImage, nSelImage);
         if (nImage >= 0) {
             nIndent++;
         }
 
-        nMaxWidth += nIndent * m_Tree.GetIndent();
+        nMaxWidth += nIndent * m_CheckTree.GetIndent();
     }
 
-    if (!bIgnoreCollapsed || (m_Tree.GetItemState(hItem, TVIS_EXPANDED) & TVIS_EXPANDED)) {
+    if (!bIgnoreCollapsed || (m_CheckTree.GetItemState(hItem, TVIS_EXPANDED) & TVIS_EXPANDED)) {
         // process child items recursively
-        HTREEITEM hSubItem = m_Tree.GetChildItem(hItem);
+        HTREEITEM hSubItem = m_CheckTree.GetChildItem(hItem);
         while (hSubItem) {
             int nSubWidth = GetMaxColumnWidth(hSubItem, nColumn, nDepth + 1, bIgnoreCollapsed);
             if (nSubWidth > nMaxWidth) {
                 nMaxWidth = nSubWidth;
             }
 
-            hSubItem = m_Tree.GetNextSiblingItem(hSubItem);
+            hSubItem = m_CheckTree.GetNextSiblingItem(hSubItem);
         }
     }
 

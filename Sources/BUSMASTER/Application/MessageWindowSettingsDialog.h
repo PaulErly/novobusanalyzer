@@ -30,6 +30,7 @@ class MessageWindowSettingsDialog : public CPropertySheet
     DECLARE_DYNAMIC(MessageWindowSettingsDialog)
 
     MessageWindowSettings* mSettings;
+    HINSTANCE m_hOldResource;
     CPPageMessage* odDBMsg;
     CPPageMessage* odNDBMsg;
     CMsgFilterConfigPage* omFilter;

@@ -33,8 +33,134 @@
 #include <algorithm>
 #include <map>
 #include <list>
+#include <sstream>
+
+class CBaseConverter
+{
+public:
+    virtual HRESULT GetInputFileFilters(string&, string&) = 0;
+    virtual HRESULT GetOutputFileFilters(string&, string&) = 0;
+    virtual HRESULT ConvertFile(string& chInputFile, string& chOutputFile) = 0;
+    virtual HRESULT GetConverterName(string& strConverterName) = 0;
+    virtual HRESULT GetErrorStatus(HRESULT hResult, string& omstrStatus) = 0;
+    virtual HRESULT GetLastConversionStatus(HRESULT& hResult, string& omstrStatus) = 0;
+    virtual HRESULT GetHelpText(CString& pchHelpText) = 0;
+    virtual BOOL bHaveOwnWindow() = 0;
+    virtual HRESULT GetPropertyPage(CPropertyPage*& pPage) = 0;
+    virtual HRESULT GettextBusmaster() = 0;
+    virtual ~CBaseConverter() {}
+};
+
+typedef HRESULT (*GETBASECONVERTER)(CBaseConverter*& pouConverter);
 
 static CHAR s_acTraceStr[1024] = {""};
+
+namespace
+{
+CString GetModuleDirectory()
+{
+    TCHAR modulePath[MAX_PATH] = {0};
+    if (GetModuleFileName(nullptr, modulePath, MAX_PATH) == 0)
+    {
+        return CString();
+    }
+
+    CString strModulePath(modulePath);
+    const int nSlash = strModulePath.ReverseFind(_T('\\'));
+    if (nSlash >= 0)
+    {
+        return strModulePath.Left(nSlash);
+    }
+    return CString();
+}
+
+bool bIsDbcFile(const CString& strFileName)
+{
+    CString strLower = strFileName;
+    strLower.MakeLower();
+    return strLower.Right(4) == ".dbc";
+}
+
+bool bConvertDbcToDbf(const CString& strDbcFile, CString& strDbfFile)
+{
+    strDbfFile.Empty();
+#if defined(_WIN64)
+    const CString strModuleDir = GetModuleDirectory();
+    CString strDllPath = strModuleDir;
+    if (!strDllPath.IsEmpty())
+    {
+        strDllPath += _T("\\DBC2DBFConverter.dll");
+    }
+
+    HMODULE hModule = nullptr;
+    if (!strDllPath.IsEmpty())
+    {
+        hModule = LoadLibrary(strDllPath);
+    }
+    if (hModule == nullptr)
+    {
+        hModule = LoadLibrary("DBC2DBFConverter.dll");
+    }
+    if (hModule == nullptr)
+    {
+        TRACE1("DBC2DBFConverter.dll is unavailable for %s; DBC import is disabled.\n",
+               CT2A(strDbcFile));
+        return false;
+    }
+
+    auto pGetBaseConverter =
+        reinterpret_cast<GETBASECONVERTER>(GetProcAddress(hModule, "GetBaseConverter"));
+    if (pGetBaseConverter == nullptr)
+    {
+        FreeLibrary(hModule);
+        TRACE0("GetBaseConverter export is unavailable in DBC2DBFConverter.dll.\n");
+        return false;
+    }
+
+    CBaseConverter* pConverter = nullptr;
+    if (FAILED(pGetBaseConverter(pConverter)) || pConverter == nullptr)
+    {
+        FreeLibrary(hModule);
+        TRACE0("Failed to create DBC converter instance.\n");
+        return false;
+    }
+
+    TCHAR tempPath[MAX_PATH] = {0};
+    if (GetTempPath(MAX_PATH, tempPath) == 0)
+    {
+        delete pConverter;
+        FreeLibrary(hModule);
+        return false;
+    }
+
+    CString strOutputPath;
+    strOutputPath.Format(_T("%sNovoBusAnalyzer_%lu_%lu.dbf"),
+                         tempPath,
+                         static_cast<unsigned long>(GetCurrentProcessId()),
+                         static_cast<unsigned long>(GetTickCount()));
+
+    std::string inputFile = CT2A(strDbcFile);
+    std::string outputFile = CT2A(strOutputPath);
+    HRESULT hResult = pConverter->ConvertFile(inputFile, outputFile);
+
+    delete pConverter;
+    FreeLibrary(hModule);
+
+    if (FAILED(hResult))
+    {
+        TRACE1("DBC to DBF conversion failed for %s\n", CT2A(strDbcFile));
+        return false;
+    }
+
+    strDbfFile = strOutputPath;
+    return true;
+#else
+    UNREFERENCED_PARAMETER(strDbcFile);
+    UNREFERENCED_PARAMETER(strDbfFile);
+    return false;
+#endif
+}
+}  // namespace
 
 //Trace window ptr
 CUIThread* CMsgSignal::m_pUIThread = nullptr;
@@ -1081,9 +1207,32 @@ BOOL CMsgSignal::bFillDataStructureFromDatabaseFile( CString strFileName, eProto
     BOOL bReturnValue   = TRUE;
     BOOL bIsFileOpen    = FALSE;
     BOOL bIsMessageLengthExceeds = FALSE;
+    CString strLoadFileName = strFileName;
+    bool bTempDbfCreated = false;
     m_unMessageCount = 0;
+
+#if defined(_WIN64)
+    if (bIsDbcFile(strFileName))
+    {
+        if (eProtocolName != PROTOCOL_CAN)
+        {
+            strcpy_s(s_acTraceStr, 1024, _("DBC import is only supported for CAN in this x64 build."));
+            vWriteTextToTrace();
+            return FALSE;
+        }
+
+        if (!bConvertDbcToDbf(strFileName, strLoadFileName))
+        {
+            strcpy_s(s_acTraceStr, 1024, _("DBC import failed."));
+            vWriteTextToTrace();
+            return FALSE;
+        }
+        bTempDbfCreated = true;
+    }
+#endif
+
     // validate the file
-    bReturnValue = bValidateDatabaseFile(strFileName);
+    bReturnValue = bValidateDatabaseFile(strLoadFileName);
     if ( bReturnValue )
     {
         char* charArray = nullptr;
@@ -1099,7 +1248,7 @@ BOOL CMsgSignal::bFillDataStructureFromDatabaseFile( CString strFileName, eProto
         {
             // Open File
             bIsFileOpen = o_File.Open(
-                strFileName, CFile::modeRead|CFile::typeText );
+            strLoadFileName, CFile::modeRead|CFile::typeText );
             if(bIsFileOpen != FALSE )
             {
                 CString sFirstLine  = "";
@@ -1180,7 +1329,7 @@ BOOL CMsgSignal::bFillDataStructureFromDatabaseFile( CString strFileName, eProto
                                 // If the loaded file is not CAN database file
                                 if(omstrDatabaseProtocol != DATABASE_PROTOCOL_CAN)
                                 {
-                                    strcpy(s_acTraceStr, strFileName + _(" is not created for CAN. Please load CAN related dbf file."));
+                                    strcpy(s_acTraceStr, strLoadFileName + _(" is not created for CAN. Please load CAN related dbf file."));
                                     vWriteTextToTrace();//(WM_WRITE_TO_TRACE, 0, (LPARAM)s_acTraceStr);
                                     return FALSE;
                                 }
@@ -1191,7 +1340,7 @@ BOOL CMsgSignal::bFillDataStructureFromDatabaseFile( CString strFileName, eProto
                                 // If the loaded file is not J1939 database file
                                 if(omstrDatabaseProtocol != DATABASE_PROTOCOL_J1939)
                                 {
-                                    strcpy(s_acTraceStr, strFileName + _(" is not created for J1939. Please load J1939 related dbf file."));
+                                    strcpy(s_acTraceStr, strLoadFileName + _(" is not created for J1939. Please load J1939 related dbf file."));
                                     vWriteTextToTrace();//(WM_WRITE_TO_TRACE, 0, (LPARAM)s_acTraceStr);
                                     return FALSE;
                                 }
@@ -1988,6 +2137,10 @@ BOOL CMsgSignal::bFillDataStructureFromDatabaseFile( CString strFileName, eProto
         m_bIsDatabaseSaved = TRUE;
     }
 
+    if (bTempDbfCreated)
+    {
+        CFile::Remove(strLoadFileName);
+    }
     return (bReturnValue);
 }
 

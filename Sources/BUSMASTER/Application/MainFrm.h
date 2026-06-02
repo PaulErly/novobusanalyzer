@@ -323,6 +323,7 @@ protected:
     afx_msg void OnConfigDatabaseSave();
     afx_msg void OnConfigMessageDisplay();
     afx_msg void OnConfigMessageDisplayLin();
+    afx_msg void OnHelp();
     afx_msg void OnReplaySingleSkip();
     afx_msg void OnReplaySingleStep();
     afx_msg void OnReplayStop();
@@ -348,6 +349,7 @@ protected:
 
     afx_msg void OnUpdateConfigureDatabaseClose(CCmdUI* pCmdUI);
     afx_msg void OnUpdateConfigureDatabaseNew(CCmdUI* pCmdUI);
+    afx_msg void OnUpdateConfigureDatabaseOpenActive(CCmdUI* pCmdUI);
     afx_msg void OnUpdateConfigureDatabaseSave(CCmdUI* pCmdUI);
     afx_msg void OnUpdateConfigureDatabaseSaveas(CCmdUI* pCmdUI);
     afx_msg void OnClose();
@@ -770,6 +772,7 @@ public:
     afx_msg void OnUpdateJ1939Timeouts(CCmdUI* pCmdUI);
     afx_msg void OnUpdateJ1939DBNew(CCmdUI* pCmdUI);
     afx_msg void OnJ1939DBNew();
+    afx_msg void OnUpdateJ1939DBOpen(CCmdUI* pCmdUI);
     afx_msg void OnJ1939DBOpen();
     afx_msg void OnJ1939DBClose();
     afx_msg LRESULT OnJ1939DBClose(WPARAM wParam, LPARAM lParam);
@@ -796,6 +799,7 @@ public:
     afx_msg void OnCfgSendMsgsLIN();
     afx_msg void OnLinClusterConfig();
     afx_msg void OnLDFEditor();
+    afx_msg void OnUpdateLDFEditor(CCmdUI* pCmdUI);
 
 	afx_msg void OnApplicationLook(UINT id);
 

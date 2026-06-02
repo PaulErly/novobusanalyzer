@@ -43,14 +43,15 @@ extern CCANMonitorApp theApp;
  Modifications  :
 ******************************************************************************/
 CMsgBufferConfigPage::CMsgBufferConfigPage(msgBufferSettings* msgBufferSettings) :
-    CPropertyPage(CMsgBufferConfigPage::IDD,
-                  IDS_PPAGE_TITLE_BUFFER)
+    CPropertyPage(CMsgBufferConfigPage::IDD)
 {
     mMsgBufferSettings = msgBufferSettings;
     m_unAppendSize = 0;
     m_unOverWriteSize = 0;
     m_unDisplayUpdateRate = 0;
     m_pnBufferSize = nullptr;
+    m_psp.dwFlags |= PSP_USETITLE;
+    m_psp.pszTitle = _T("Buffer");
 }
 
 /******************************************************************************
@@ -70,14 +71,8 @@ CMsgBufferConfigPage::~CMsgBufferConfigPage()
 void CMsgBufferConfigPage::DoDataExchange(CDataExchange* pDX)
 {
     CPropertyPage::DoDataExchange(pDX);
-    //{{AFX_DATA_MAP(CMsgBufferConfigPage)
-    DDX_Text(pDX, IDC_EDIT_APPEND_SIZE, m_unAppendSize);
-    DDV_MinMaxUInt(pDX, m_unAppendSize, defMIN_BUFFER_SIZE, defMAX_BUFFER_SIZE);
-    DDX_Text(pDX, IDC_EDIT_OVERWRITE_SIZE, m_unOverWriteSize);
-    DDV_MinMaxUInt(pDX, m_unOverWriteSize, defMIN_BUFFER_SIZE, defMAX_BUFFER_SIZE);
-    DDX_Text(pDX, IDC_EDIT_DISPLAY_UPDATE, m_unDisplayUpdateRate);
-    DDV_MinMaxUInt(pDX, m_unDisplayUpdateRate, defMIN_DISPLAY_UPDATE_TIME, defMAX_DISPLAY_UPDATE_TIME);
-    //}}AFX_DATA_MAP
+    // Keep this page out of DDX_Text/validation. The legacy dialog template
+    // is now bound explicitly in OnInitDialog/OnOK to avoid MFC assertions.
 }
 
 
@@ -102,8 +97,31 @@ END_MESSAGE_MAP()
 *******************************************************************************/
 void CMsgBufferConfigPage::OnOK()
 {
-    // Update Global Data Here
-    UpdateData( TRUE );
+    BOOL bTranslated = FALSE;
+    if (GetDlgItem(IDC_EDIT_APPEND_SIZE) != nullptr)
+    {
+        UINT unValue = GetDlgItemInt(IDC_EDIT_APPEND_SIZE, &bTranslated, FALSE);
+        if (bTranslated)
+        {
+            m_unAppendSize = unValue;
+        }
+    }
+    if (GetDlgItem(IDC_EDIT_OVERWRITE_SIZE) != nullptr)
+    {
+        UINT unValue = GetDlgItemInt(IDC_EDIT_OVERWRITE_SIZE, &bTranslated, FALSE);
+        if (bTranslated)
+        {
+            m_unOverWriteSize = unValue;
+        }
+    }
+    if (GetDlgItem(IDC_EDIT_DISPLAY_UPDATE) != nullptr)
+    {
+        UINT unValue = GetDlgItemInt(IDC_EDIT_DISPLAY_UPDATE, &bTranslated, FALSE);
+        if (bTranslated)
+        {
+            m_unDisplayUpdateRate = unValue;
+        }
+    }
     // Check for data boundary condition
     if( m_unAppendSize >= defMIN_BUFFER_SIZE &&
             m_unAppendSize <= defMAX_BUFFER_SIZE &&
@@ -137,12 +155,33 @@ Modifications    :
 *******************************************************************************/
 BOOL CMsgBufferConfigPage::OnInitDialog()
 {
-    CPropertyPage::OnInitDialog();
+    TRACE0("MsgBufferConfigPage::OnInitDialog\n");
+    HINSTANCE hOldResource = AfxGetResourceHandle();
+    AfxSetResourceHandle(AfxGetInstanceHandle());
+    CDialog::OnInitDialog();
+    if (GetSafeHwnd() == nullptr)
+    {
+        TRACE0("Message buffer config page has no window handle.\n");
+        return FALSE;
+    }
     // Update the UI controls
     m_unAppendSize = mMsgBufferSettings->mAppendSize;
     m_unOverWriteSize = mMsgBufferSettings->mOverWriteSize;
     m_unDisplayUpdateRate = mMsgBufferSettings->mDisplayUpdateRate;
-    UpdateData(FALSE);
+    if (GetDlgItem(IDC_EDIT_APPEND_SIZE) != nullptr)
+    {
+        SetDlgItemInt(IDC_EDIT_APPEND_SIZE, m_unAppendSize, FALSE);
+    }
+    if (GetDlgItem(IDC_EDIT_OVERWRITE_SIZE) != nullptr)
+    {
+        SetDlgItemInt(IDC_EDIT_OVERWRITE_SIZE, m_unOverWriteSize, FALSE);
+    }
+    if (GetDlgItem(IDC_EDIT_DISPLAY_UPDATE) != nullptr)
+    {
+        SetDlgItemInt(IDC_EDIT_DISPLAY_UPDATE, m_unDisplayUpdateRate, FALSE);
+    }
+
+    AfxSetResourceHandle(hOldResource);
 
     return TRUE;  // return TRUE unless you set the focus to a control
     // EXCEPTION: OCX Property Pages should return FALSE

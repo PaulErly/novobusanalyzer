@@ -56,7 +56,10 @@ CBaseFrameProcessor_CAN* GetICANLogger(void)
     {
         // Nothing to do at this moment
     }
-    ASSERT(nullptr != Result);
+    if (Result == nullptr)
+    {
+        TRACE0("GetICANLogger returned nullptr.\n");
+    }
     return Result;
 }
 
@@ -68,7 +71,10 @@ CBaseFrameProcessor_LIN* GetILINLogger(void)
     {
         // Nothing to do at this moment
     }
-    ASSERT(nullptr != Result);
+    if (Result == nullptr)
+    {
+        TRACE0("GetILINLogger returned nullptr.\n");
+    }
     return Result;
 }
 
@@ -79,7 +85,10 @@ CBaseFrameProcessor_J1939* GetIJ1939Logger(void)
     {
         // Nothing to do at this moment
     }
-    ASSERT(nullptr != Result);
+    if (Result == nullptr)
+    {
+        TRACE0("GetIJ1939Logger returned nullptr.\n");
+    }
     return Result;
 }
 void ReleaseLogger(eID_COMPONENT interfaceId)
@@ -89,14 +98,20 @@ void ReleaseLogger(eID_COMPONENT interfaceId)
 CMainFrame* GetIMainFrame(void)
 {
     CMainFrame* Result = static_cast<CMainFrame*> (theApp.m_pMainWnd);
-    ASSERT(nullptr != Result);
+    if (Result == nullptr)
+    {
+        TRACE0("GetIMainFrame returned nullptr.\n");
+    }
     return Result;
 }
 
 CFlags* GetIFlags(void)
 {
     CFlags* Result = (theApp.pouGetFlagsPtr());
-    ASSERT(nullptr != Result);
+    if (Result == nullptr)
+    {
+        TRACE0("GetIFlags returned nullptr.\n");
+    }
     return Result;
 }
 
@@ -105,11 +120,14 @@ CBaseDIL_LIN* GetILINDIL(void)
     CBaseDIL_LIN* Result = nullptr;
     if ( DIL_GetInterface( LIN, (void**)&Result ) == S_OK )
     {
-        ASSERT(nullptr != Result);
+        if (Result == nullptr)
+        {
+            TRACE0("GetILINDIL returned nullptr.\n");
+        }
     }
     else
     {
-        ASSERT(false);
+        TRACE0("GetILINDIL interface query failed.\n");
     }
     return Result;
 }
@@ -120,11 +138,14 @@ CBaseDIL_CAN* GetICANDIL(void)
     CBaseDIL_CAN* Result = nullptr;
     if ( DIL_GetInterface( CAN, (void**)&Result ) == S_OK )
     {
-        ASSERT(nullptr != Result);
+        if (Result == nullptr)
+        {
+            TRACE0("GetICANDIL returned nullptr.\n");
+        }
     }
     else
     {
-        ASSERT(false);
+        TRACE0("GetICANDIL interface query failed.\n");
     }
     return Result;
 }
@@ -134,11 +155,14 @@ CBaseDILI_J1939* GetIJ1939DIL(void)
     CBaseDILI_J1939* Result = nullptr;
     if ( DIL_GetInterface( J1939, (void**)&Result ) == S_OK )
     {
-        ASSERT(nullptr != Result);
+        if (Result == nullptr)
+        {
+            TRACE0("GetIJ1939DIL returned nullptr.\n");
+        }
     }
     else
     {
-        ASSERT(false);
+        TRACE0("GetIJ1939DIL interface query failed.\n");
     }
     return Result;
 }
@@ -148,11 +172,14 @@ CBaseBusStatisticCAN* GetICANBusStat(void)
     CBaseBusStatisticCAN* Result = nullptr;
     if (BS_GetInterface(CAN, (void**) &Result) == S_OK)
     {
-        ASSERT(nullptr != Result);
+        if (Result == nullptr)
+        {
+            TRACE0("GetICANBusStat returned nullptr.\n");
+        }
     }
     else
     {
-        ASSERT(false);
+        TRACE0("GetICANBusStat interface query failed.\n");
     }
     return Result;
 }
@@ -162,11 +189,14 @@ CBaseBusStatisticLIN* GetILINBusStat(void)
     CBaseBusStatisticLIN* Result = nullptr;
     if (BS_GetInterface(LIN, (void**) &Result) == S_OK)
     {
-        ASSERT(nullptr != Result);
+        if (Result == nullptr)
+        {
+            TRACE0("GetILINBusStat returned nullptr.\n");
+        }
     }
     else
     {
-        ASSERT(false);
+        TRACE0("GetILINBusStat interface query failed.\n");
     }
     return Result;
 }
@@ -195,7 +225,10 @@ CBaseNodeSim* GetICANNodeSim(void)
     {
         // Nothing to do at this moment
     }
-    ASSERT(nullptr != Result);
+    if (Result == nullptr)
+    {
+        TRACE0("GetICANNodeSim returned nullptr.\n");
+    }
     return Result;
 }
 CBaseNodeSim* GetILINNodeSim(void)
@@ -205,7 +238,10 @@ CBaseNodeSim* GetILINNodeSim(void)
     {
         // Nothing to do at this moment
     }
-    ASSERT(nullptr != Result);
+    if (Result == nullptr)
+    {
+        TRACE0("GetILINNodeSim returned nullptr.\n");
+    }
     return Result;
 }
 
@@ -216,6 +252,9 @@ CBaseNodeSim* GetIJ1939NodeSim(void)
     {
         // Nothing to do at this moment
     }
-    ASSERT(nullptr != Result);
+    if (Result == nullptr)
+    {
+        TRACE0("GetIJ1939NodeSim returned nullptr.\n");
+    }
     return Result;
 }

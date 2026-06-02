@@ -54,14 +54,16 @@ CPPageMessage::CPPageMessage() : CPropertyPage(CPPageMessage::IDD)
 }
 
 CPPageMessage::CPPageMessage(BOOL bForDBMsg, UINT* msgIds, unsigned int msgCount, CMessageAttrib* msgAttributes) :
-    CPropertyPage(CPPageMessage::IDD,
-                  bForDBMsg ? IDS_PPAGE_TITLE_DBMSG : IDS_PPAGE_TITLE_NDBMSG)
+    CPropertyPage(CPPageMessage::IDD)
 {
     m_bForDBMsg    = bForDBMsg;
     m_pRGBColors   = nullptr;
     mUnDBMsgs = msgIds;
     mUnTotalDBMsgs = msgCount;
     mMsgAttributes = msgAttributes;
+
+    m_psp.dwFlags |= PSP_USETITLE;
+    m_psp.pszTitle = bForDBMsg ? _T("DB") : _T("NDB");
 }
 
 CPPageMessage::~CPPageMessage()
@@ -76,9 +78,9 @@ CPPageMessage::~CPPageMessage()
 void CPPageMessage::DoDataExchange(CDataExchange* pDX)
 {
     CPropertyPage::DoDataExchange(pDX);
-    DDX_Control(pDX, IDC_LIST_MESSAGE, m_odMsgList);
-    DDX_Control(pDX, IDC_BUTTON_REMOVE, m_ctrlRemove);
-    DDX_Control(pDX, IDC_BUTTON_ADD, m_ctrlAdd);
+    // Intentionally avoid DDX_Control here. The legacy dialog templates can be
+    // rebound under different resource handles in the modernized runtime, and
+    // manual attachment in OnInitDialog is more tolerant than MFC's DDX path.
 }
 
 
@@ -97,13 +99,37 @@ END_MESSAGE_MAP()
 
 BOOL CPPageMessage::OnInitDialog()
 {
-    CPropertyPage::OnInitDialog();
+    TRACE1("CPPageMessage::OnInitDialog for %s\n", m_bForDBMsg ? _T("DB") : _T("Non-DB"));
+    HINSTANCE hOldResource = AfxGetResourceHandle();
+    AfxSetResourceHandle(AfxGetInstanceHandle());
+    CDialog::OnInitDialog();
+    CWnd* pMsgList = GetDlgItem(IDC_LIST_MESSAGE);
+    if (pMsgList == nullptr || !::IsWindow(pMsgList->GetSafeHwnd()) || !m_odMsgList.SubclassWindow(pMsgList->GetSafeHwnd()))
+    {
+        TRACE0("Message list control is missing from the dialog template.\n");
+        AfxMessageBox(_("Unable to open the message display settings."), MB_ICONSTOP | MB_OK);
+        return FALSE;
+    }
+    if (CWnd* pAdd = GetDlgItem(IDC_BUTTON_ADD))
+    {
+        m_ctrlAdd.SubclassWindow(pAdd->GetSafeHwnd());
+    }
+    if (CWnd* pRemove = GetDlgItem(IDC_BUTTON_REMOVE))
+    {
+        m_ctrlRemove.SubclassWindow(pRemove->GetSafeHwnd());
+    }
 
     // TODO: Add extra initialization here
     if (m_bForDBMsg)
     {
-        m_ctrlAdd.ShowWindow(SW_HIDE);
-        m_ctrlRemove.ShowWindow(SW_HIDE);
+        if (m_ctrlAdd.GetSafeHwnd() != nullptr)
+        {
+            m_ctrlAdd.ShowWindow(SW_HIDE);
+        }
+        if (m_ctrlRemove.GetSafeHwnd() != nullptr)
+        {
+            m_ctrlRemove.ShowWindow(SW_HIDE);
+        }
     }
 
     m_odMsgList.SetExtendedStyle(m_odMsgList.GetExtendedStyle()
@@ -119,9 +145,16 @@ BOOL CPPageMessage::OnInitDialog()
 
     BOOL bAnyMsgEntered = (nInitialiseMsgLCtrl(mUnTotalDBMsgs, mUnDBMsgs) > 0);
 
-    GetDlgItem(IDC_BUTTON_REMOVE)->EnableWindow(bAnyMsgEntered);
-    GetDlgItem(IDC_BUTTON_EDIT)->EnableWindow(bAnyMsgEntered);
+    if (CWnd* pRemove = GetDlgItem(IDC_BUTTON_REMOVE))
+    {
+        pRemove->EnableWindow(bAnyMsgEntered);
+    }
+    if (CWnd* pEdit = GetDlgItem(IDC_BUTTON_EDIT))
+    {
+        pEdit->EnableWindow(bAnyMsgEntered);
+    }
 
+    AfxSetResourceHandle(hOldResource);
     return TRUE;  // return TRUE unless you set the focus to a control
     // EXCEPTION: OCX Property Pages should return FALSE
 }

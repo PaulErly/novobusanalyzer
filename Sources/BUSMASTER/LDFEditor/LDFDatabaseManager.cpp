@@ -1,6 +1,7 @@
 #include "LDFDatabaseManager.h"
 
 #include "qsettings.h"
+#include <QMessageBox>
 
 LDFDatabaseManager* LDFDatabaseManager::m_pouLdfDatabaseManager = nullptr;
 
@@ -70,12 +71,18 @@ LDFDatabaseManager* LDFDatabaseManager::GetDatabaseManager() {
 
 ICluster* LDFDatabaseManager::GetLDFCluster() {
   if (nullptr == m_pfCreateLDFCluster) {
+#if defined(_WIN64)
+    QMessageBox::warning(nullptr, "BUSMASTER LDF Editor",
+                         "Database import is unavailable in this x64 build because DBManager.dll is x86-only.");
+    return nullptr;
+#else
     mDbManagerDll.setFileName("DBManager");
     m_pfCreateLDFCluster =
         (CreateLDFCluster)mDbManagerDll.resolve("CreateLDFCluster");
     if (nullptr == m_pfCreateLDFCluster) {
       return nullptr;
     }
+#endif
   }
 
   if (nullptr == m_pouLDFClsuter) {

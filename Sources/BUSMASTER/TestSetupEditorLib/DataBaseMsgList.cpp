@@ -71,6 +71,11 @@ Modifications  :
 ******************************************************************************/
 ERRORCODE CDataBaseMsgList::FillDataStructureFromDatabaseFile( std::string strFileName )
 {
+    if ( !mDbManagerAccess.isDbManagerAvailable() )
+    {
+        TRACE0("DBManager.dll is unavailable; Test Automation database import is disabled.\n");
+        return ERR_INVALID_DATABASE;
+    }
     bFreeMessageMemory();
     std::list<ClusterResult> clusterList;
     ERRORCODE ecError = mDbManagerAccess.mParseDbFile( strFileName, CAN, clusterList );
@@ -127,6 +132,10 @@ Modifications  :
 ******************************************************************************/
 INT CDataBaseMsgList::nFillMessageList(CComboBox& omDbMsgCombo, BOOL bEmptyString)
 {
+    if ( nullptr == mCurrentCluster )
+    {
+        return ERR_INVALID_DATABASE;
+    }
     std::map<UID_ELEMENT, IElement*> frameList;
     mCurrentCluster->GetElementList( eFrameElement, frameList );
     std::string frameName;

@@ -107,6 +107,7 @@ BOOL CCANMonitorApp::InitInstance()
     if (ghLangInst) {
         AfxSetResourceHandle( ghLangInst );
     }
+    m_pszHelpFilePath = _tcsdup(_T("BUSMASTER.chm"));
     // End of Multiple Language support
 
 	INITCOMMONCONTROLSEX InitCtrls;

@@ -95,6 +95,8 @@ file(GENERATE
   CONTENT "${_qt_deploy_input_content}\n"
 )
 
+set(_powershell_exe "C:/Windows/System32/WindowsPowerShell/v1.0/powershell.exe")
+
 add_custom_target(deploy_runtime ALL
   COMMAND ${CMAKE_COMMAND}
     "-DDEPLOY_DIR=$<TARGET_FILE_DIR:NovoBusAnalyzer>"
@@ -106,8 +108,9 @@ add_custom_target(deploy_runtime ALL
     "-DVCPKG_TARGET_TRIPLET=${VCPKG_TARGET_TRIPLET}"
     "-DWINDEPLOYQT_EXECUTABLE=${WINDEPLOYQT_EXECUTABLE}"
     "-DSPLASH_BITMAP=${CMAKE_CURRENT_SOURCE_DIR}/Application/Res/Splsh16.bmp"
+    "-DHELP_FILE=${CMAKE_CURRENT_SOURCE_DIR}/BIN/Release/BUSMASTER.chm"
     -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/DeployNovoBusAnalyzer.cmake"
-  COMMAND powershell -NoProfile -ExecutionPolicy Bypass
+  COMMAND "${_powershell_exe}" -NoProfile -ExecutionPolicy Bypass
     -File "${CMAKE_CURRENT_SOURCE_DIR}/cmake/VerifyX64Runtime.ps1"
     "$<TARGET_FILE_DIR:NovoBusAnalyzer>"
   DEPENDS

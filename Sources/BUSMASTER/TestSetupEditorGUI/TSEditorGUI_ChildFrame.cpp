@@ -3072,6 +3072,8 @@ Modifications  :
 ******************************************************************************/
 void CTSEditorChildFrame::OnDisplaySettings()
 {
+    HINSTANCE hOldResource = AfxGetResourceHandle();
+    AfxSetResourceHandle(AfxGetInstanceHandle());
     CTSEditorSettingsDlg ouSettingsDlg;
     COLORREF omBkColor, omTextColor, omRow1Color, omRow2Color;
     m_odTreeView->vGetTreeCtrlColor(omBkColor, omTextColor);
@@ -3090,6 +3092,7 @@ void CTSEditorChildFrame::OnDisplaySettings()
                 ouSettingsDlg.m_Row2Color.GetColour());
         m_bQueryConfirm = !ouSettingsDlg.m_bQueryConfirm;
     }
+    AfxSetResourceHandle(hOldResource);
 
 }
 
@@ -3719,20 +3722,22 @@ Code Tag       :
 ******************************************************************************/
 void CTSEditorChildFrame::OnHelpTesteditorhelp()
 {
-    // Get Application Help File Path
-    CString omStrPath = AfxGetApp()->m_pszHelpFilePath;
+    TCHAR szPath[MAX_PATH] = {};
+    if (GetModuleFileName(nullptr, szPath, MAX_PATH) == 0)
+    {
+        AfxMessageBox(_("Failed to launch help."), MB_ICONWARNING | MB_OK);
+        return;
+    }
 
-	    // Replace .hlp with .chm
-    int nIndex = omStrPath.ReverseFind( PERIOD );
-    // Extract string before the extension
-    omStrPath = omStrPath.Mid(0, nIndex );
-    // Add New Extension
-    omStrPath = omStrPath + ".chm"+"::/topics/test_setup_editor.html";
-
-	omStrPath.Replace("TestSetupEditorGUI.chm", "BUSMASTER.chm");
-	
-    // Make it as content display always
-    ::HtmlHelp(nullptr, omStrPath, HH_DISPLAY_TOPIC, 0);
+    PathRemoveFileSpec(szPath);
+    const CString omHelpFile = CString(szPath) + _T("\\BUSMASTER.chm");
+    const CString omStrPath = omHelpFile + _T("::/topics/test_setup_editor.html");
+    if (::HtmlHelp(nullptr, omStrPath, HH_DISPLAY_TOPIC, 0) == nullptr)
+    {
+        TRACE1("Failed to open help topic from %s\n", omStrPath);
+        ShellExecute(nullptr, _T("open"), omHelpFile, nullptr, szPath, SW_SHOWNORMAL);
+        AfxMessageBox(_("Failed to launch help."), MB_ICONWARNING | MB_OK);
+    }
 }
 
 void CTSEditorChildFrame::OnClose() 

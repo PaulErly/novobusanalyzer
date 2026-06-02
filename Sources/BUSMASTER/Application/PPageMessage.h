@@ -39,6 +39,7 @@ public:
 
     // Dialog Data
     enum { IDD = IDD_PPAGE_MESSAGE };
+    enum { IDD_TITLE_DBMSG = IDS_PPAGE_TITLE_DBMSG, IDD_TITLE_NDBMSG = IDS_PPAGE_TITLE_NDBMSG };
     CMessageList    m_odMsgList;
     CButton m_ctrlRemove;
     CButton m_ctrlAdd;

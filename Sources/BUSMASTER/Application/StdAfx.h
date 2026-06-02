@@ -81,7 +81,7 @@ const float PI = (float) 3.14159265358979323846;
 #include <shlwapi.h>
 #include <comutil.h>
 #include <afxdlgs.h>
-#import <msxml6.dll>
+#import "C:\\Windows\\System32\\msxml6.dll"
 #include "afxribbonbar.h"
 
 #include <afxcontrolbars.h>     // Added to support for ribbons and control bars
