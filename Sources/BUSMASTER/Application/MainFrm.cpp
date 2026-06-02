@@ -94,6 +94,7 @@
 #include "MessageWindowSettingsDialog.h"
 #include "UI/BusmasterMenuItem.h"
 #include "DataTypes/NSCodeGenHelperFactory.h"
+#include <shellapi.h>
 
 #define MSG_GET_CONFIGPATH  10000
 #define FromXMLFile 1 //To show the called InitializeDil() is from XmlConfig
@@ -117,6 +118,66 @@ extern BOOL g_bStopMsgHandlers;
 extern BOOL gbMsgTransmissionOnOff(BOOL bOnOff,HMODULE hModule);
 
 BOOL g_bStopSelectedMsgTx ;
+
+namespace
+{
+    class CScopedResourceHandle
+    {
+    public:
+        explicit CScopedResourceHandle(HINSTANCE hNewResource)
+            : m_hOldResource(AfxGetResourceHandle())
+        {
+            AfxSetResourceHandle(hNewResource);
+        }
+
+        ~CScopedResourceHandle()
+        {
+            AfxSetResourceHandle(m_hOldResource);
+        }
+
+    private:
+        HINSTANCE m_hOldResource;
+    };
+
+    CString GetModuleDirectory()
+    {
+        TCHAR szPath[MAX_PATH] = {};
+        if (GetModuleFileName(nullptr, szPath, MAX_PATH) == 0)
+        {
+            return CString();
+        }
+
+        PathRemoveFileSpec(szPath);
+        return CString(szPath);
+    }
+
+    bool LaunchExecutable(const CString& executablePath, const CString& arguments, const CString& workingDirectory, UINT* pError = nullptr)
+    {
+        SHELLEXECUTEINFO sei = {};
+        sei.cbSize = sizeof(sei);
+        sei.fMask = SEE_MASK_NOCLOSEPROCESS;
+        sei.nShow = SW_SHOWNORMAL;
+        sei.lpFile = executablePath;
+        sei.lpParameters = arguments.IsEmpty() ? nullptr : arguments.GetString();
+        sei.lpDirectory = workingDirectory.IsEmpty() ? nullptr : workingDirectory.GetString();
+        sei.lpVerb = _T("open");
+
+        if (!ShellExecuteEx(&sei))
+        {
+            if (pError != nullptr)
+            {
+                *pError = GetLastError();
+            }
+            return false;
+        }
+
+        if (sei.hProcess != nullptr)
+        {
+            CloseHandle(sei.hProcess);
+        }
+        return true;
+    }
+}
 
 // Flag for Msg Handler status
 extern BOOL g_bMsgHandlerON;
@@ -242,6 +303,7 @@ BEGIN_MESSAGE_MAP(CMainFrame, CMDIFrameWndEx)
 
     ON_UPDATE_COMMAND_UI(IDM_CONFIGURE_DATABASE_CLOSE, OnUpdateConfigureDatabaseClose)
     ON_UPDATE_COMMAND_UI(IDM_CONFIGURE_DATABASE_NEW, OnUpdateConfigureDatabaseNew)
+    ON_UPDATE_COMMAND_UI(IDM_CONFIGURE_DATABASE_OPENACTIVE, OnUpdateConfigureDatabaseOpenActive)
     ON_UPDATE_COMMAND_UI(IDM_CONFIGURE_DATABASE_SAVE, OnUpdateConfigureDatabaseSave)
     ON_UPDATE_COMMAND_UI(IDM_CONFIGURE_DATABASE_SAVEAS, OnUpdateConfigureDatabaseSaveas)
     ON_WM_CLOSE()
@@ -340,7 +402,7 @@ BEGIN_MESSAGE_MAP(CMainFrame, CMDIFrameWndEx)
     ON_COMMAND_RANGE(IDC_SELECT_LIN_DRIVER,IDC_SELECT_LIN_DRIVER + 5, OnSelectLINDriver)
     ON_UPDATE_COMMAND_UI_RANGE(IDC_SELECT_LIN_DRIVER,IDC_SELECT_LIN_DRIVER + 5, OnUpdateSelectLINDriver)
     ON_COMMAND(ID_HELP_FINDER, CMDIFrameWndEx::OnHelpFinder)
-    ON_COMMAND(ID_HELP, CMDIFrameWndEx::OnHelp)
+    ON_COMMAND(ID_HELP, OnHelp)
     ON_COMMAND(ID_CONTEXT_HELP, CMDIFrameWndEx::OnContextHelp)
     ON_COMMAND(ID_DEFAULT_HELP, CMDIFrameWndEx::OnHelpFinder)
     ON_MESSAGE(WM_PROCESS_ERROR_MESSAGE, OnErrorMessageProc)
@@ -354,6 +416,7 @@ BEGIN_MESSAGE_MAP(CMainFrame, CMDIFrameWndEx)
     ON_COMMAND(IDM_DATABASE_DISSOCIATE_DB, OnDissociateDatabase)
     ON_COMMAND(IDM_SAVE_IMPORT, OnSaveImportDatabase)
     ON_UPDATE_COMMAND_UI(IDM_SAVE_IMPORT, OnUpdateSaveImportDatabase)
+    ON_UPDATE_COMMAND_UI(IDM_FILE_IMPORT_DATABASE, OnUpdateSaveImportDatabase)
     ON_MESSAGE(WM_GET_DB_PTR, OnProvideMsgDBPtr)
     ON_MESSAGE(WM_GET_MSG_NAME_FROM_CODE, OnProvideMsgNameFromCode)
     ON_MESSAGE(WM_GET_PGN_NAME_FROM_CODE, OnProvidePGNNameFromCode)
@@ -386,6 +449,7 @@ BEGIN_MESSAGE_MAP(CMainFrame, CMDIFrameWndEx)
     ON_COMMAND(33079, OnJ1939DBNew)
     ON_UPDATE_COMMAND_UI(33079, OnUpdateJ1939DBNew)
     ON_COMMAND(33080, OnJ1939DBOpen)
+    ON_UPDATE_COMMAND_UI(33080, OnUpdateJ1939DBOpen)
     ON_COMMAND(ID_DATABASE_CLOSE, OnJ1939DBClose)
     ON_UPDATE_COMMAND_UI(ID_DATABASE_CLOSE, OnUpdateJ1939DBClose)
     ON_MESSAGE(ID_DATABASE_CLOSE, OnJ1939DBClose)
@@ -417,6 +481,7 @@ BEGIN_MESSAGE_MAP(CMainFrame, CMDIFrameWndEx)
     ON_COMMAND(ID_LIN_CLUSTER_CONFIG, OnLinClusterConfig)
     ON_UPDATE_COMMAND_UI(ID_LIN_CLUSTER_CONFIG, OnUpdateLinClusterConfig)
     ON_COMMAND(IDM_LDF_EDITOR_LIN, OnLDFEditor)
+    ON_UPDATE_COMMAND_UI(IDM_LDF_EDITOR_LIN, OnUpdateLDFEditor)
     ON_COMMAND(IDM_FILTER_MSGLINOFF, OnMessageFilterButtonLin)
     ON_UPDATE_COMMAND_UI(IDM_FILTER_MSGLINOFF, OnUpdateMessageFilterButtonLin)
 
@@ -957,6 +1022,10 @@ AUTHOR:             RBIN/EMC2 - Amarnath Shastry
 *******************************************************************************/
 void CMainFrame::OnOpenDatabase()
 {
+    if (m_ouBusmasterNetwork == nullptr || !m_ouBusmasterNetwork->isDbManagerAvailable()) {
+        AfxMessageBox(_("Database import is unavailable in this x64 build because DBManager.dll is x86-only."), MB_ICONINFORMATION | MB_OK);
+        return;
+    }
     INT nReturn = IDYES;
 
     // Check if any database is already open
@@ -981,12 +1050,12 @@ void CMainFrame::OnOpenDatabase()
         BOOL bDisplayEditor = FALSE;
 
         // Display a open file dialog
-        CFileDialog fileDlg( TRUE,      // Open File dialog
-                             "dbf",     // Default Extension,
-                             nullptr,
-                             OFN_HIDEREADONLY | OFN_OVERWRITEPROMPT,
-                             _("BUSMASTER Database File(s)(*.dbf)|*.dbf||"),
-                             nullptr );
+    CFileDialog fileDlg( TRUE,      // Open File dialog
+                         "dbc",     // Default Extension,
+                         nullptr,
+                         OFN_HIDEREADONLY | OFN_OVERWRITEPROMPT,
+                         _("BUSMASTER CAN Database File(s)(*.dbc)|*.dbc||"),
+                         nullptr );
 
         // Set Title
         fileDlg.m_ofn.lpstrTitle  = _("Select BUSMASTER Database Filename...");
@@ -1185,13 +1254,17 @@ AUTHOR:         RBIN/EMC2 - Amarnath Shastry
 *******************************************************************************/
 void CMainFrame::OnImportDatabase()
 {
+    if (m_ouBusmasterNetwork == nullptr || !m_ouBusmasterNetwork->isDbManagerAvailable()) {
+        AfxMessageBox(_("Database import is unavailable in this x64 build because DBManager.dll is x86-only."), MB_ICONINFORMATION | MB_OK);
+        return;
+    }
     CStringArray strFilePathArray;
     // Display a open file dialog
     CFileDialog fileDlg( TRUE,      // Open File dialog
-                         "dbf",     // Default Extension,
+                         "dbc",     // Default Extension,
                          nullptr,// Initial database file name.
                          OFN_HIDEREADONLY | OFN_OVERWRITEPROMPT | OFN_ALLOWMULTISELECT,
-                         _("BUSMASTER Datatbase File(*.dbf)|*.dbf||"),
+                         _("BUSMASTER CAN Database File(*.dbc)|*.dbc||"),
                          nullptr );
 
     // Set Title
@@ -1861,6 +1934,7 @@ DESCRIPTION:    #Called by the framework when user selects Configure Message...
 *******************************************************************************/
 void CMainFrame::OnConfigMessageDisplay()
 {
+    CScopedResourceHandle resourceScope(AfxGetInstanceHandle());
     if (nullptr == m_podMsgWndThread) {
         //if Msg Window is not created no need to configure its display.Since there
         //is no way to get the existing details and to save the configured values
@@ -1880,9 +1954,13 @@ void CMainFrame::OnConfigMessageDisplay()
     //Buffer
     settings.mBufferSettings.mISValidSettings = !settings.mBusmasterIsOnline;
     if (settings.mBusmasterIsOnline == FALSE) {
-        if (m_podMsgWndThread != nullptr) {//Msg window
+        if (m_podMsgWndThread != nullptr && ::IsWindow(m_podMsgWndThread->hGetHandleMsgWnd(CAN))) {//Msg window
             ::SendMessage(m_podMsgWndThread->hGetHandleMsgWnd(CAN), WM_NOTIFICATION_FROM_OTHER,
                           eWINID_MSG_WND_GET_BUFFER_DETAILS, (LPARAM)m_anMsgBuffSize[CAN]);
+        }
+        else
+        {
+            TRACE0("CAN message window handle is unavailable while reading buffer settings.\n");
         }
         settings.mBufferSettings.mAppendSize = m_anMsgBuffSize[CAN][defAPPEND_DATA_INDEX];
         settings.mBufferSettings.mOverWriteSize = m_anMsgBuffSize[CAN][defOVERWRITE_DATE_INDEX];
@@ -1897,7 +1975,15 @@ void CMainFrame::OnConfigMessageDisplay()
     }
 
     SFILTERAPPLIED_CAN sFilterAppliedCan;
-    ::SendMessage(m_podMsgWndThread->hGetHandleMsgWnd(CAN), WM_GET_FILTER_DETAILS, (WPARAM)&sFilterAppliedCan, (LPARAM)CAN);
+    if (m_podMsgWndThread != nullptr && ::IsWindow(m_podMsgWndThread->hGetHandleMsgWnd(CAN)))
+    {
+        ::SendMessage(m_podMsgWndThread->hGetHandleMsgWnd(CAN), WM_GET_FILTER_DETAILS, (WPARAM)&sFilterAppliedCan, (LPARAM)CAN);
+    }
+    else
+    {
+        TRACE0("CAN message window handle is unavailable while reading filter settings.\n");
+        sFilterAppliedCan.vClear();
+    }
     std::map<std::string, bool> filtersApplied;
     for (uint32_t i = 0; i < sFilterAppliedCan.m_ushTotal; i++) {
         settings.mFilterDetails.mFitersApplied[sFilterAppliedCan.m_psFilters[i].m_sFilterName.m_acFilterName] = (sFilterAppliedCan.m_psFilters[i].m_bEnabled!=0);
@@ -1923,6 +2009,7 @@ void CMainFrame::OnConfigMessageDisplay()
 
     //Invoke Settings Dialog
     MessageWindowSettingsDialog settingsDlg(defCONFIG_MSG_DISPLAY_CAN, &settings);
+    TRACE0("Opening CAN message display settings dialog.\n");
     BOOL bReturnVal = settingsDlg.DoModal();
     if (bReturnVal == IDOK) {
         ApplyFilterConfigToMsgWnd(settings.mFilterDetails.mFitersApplied, m_sFilterAppliedCAN);
@@ -1932,10 +2019,14 @@ void CMainFrame::OnConfigMessageDisplay()
         m_anMsgBuffSize[CAN][defDISPLAY_UPDATE_DATA_INDEX] = settings.mBufferSettings.mDisplayUpdateRate;
 
         if (nullptr != m_podMsgWndThread && settings.mBusmasterIsOnline == false) {
-            ::SendMessage(m_podMsgWndThread->hGetHandleMsgWnd(CAN), WM_NOTIFICATION_FROM_OTHER,
-                          eWINID_MSG_WND_GET_BUFFER_DETAILS, (LPARAM)m_anMsgBuffSize[CAN]);
+            if (::IsWindow(m_podMsgWndThread->hGetHandleMsgWnd(CAN))) {
+                ::SendMessage(m_podMsgWndThread->hGetHandleMsgWnd(CAN), WM_NOTIFICATION_FROM_OTHER,
+                              eWINID_MSG_WND_GET_BUFFER_DETAILS, (LPARAM)m_anMsgBuffSize[CAN]);
+            }
         }
-        ::SendMessage(m_podMsgWndThread->hGetHandleMsgWnd(CAN), WM_INVALIDATE_LIST_DISPLAY, 0, 0);
+        if (m_podMsgWndThread != nullptr && ::IsWindow(m_podMsgWndThread->hGetHandleMsgWnd(CAN))) {
+            ::SendMessage(m_podMsgWndThread->hGetHandleMsgWnd(CAN), WM_INVALIDATE_LIST_DISPLAY, 0, 0);
+        }
     }
 }
 
@@ -1943,6 +2034,7 @@ void CMainFrame::OnConfigMessageDisplay()
 
 void CMainFrame::OnConfigMessageDisplayLin()
 {
+    CScopedResourceHandle resourceScope(AfxGetInstanceHandle());
     if (nullptr == m_podMsgWndThread) {
         //if Msg Window is not created no need to configure its display.Since there
         //is no way to get the existing details and to save the configured values
@@ -1960,9 +2052,13 @@ void CMainFrame::OnConfigMessageDisplayLin()
     //Buffer
     settings.mBufferSettings.mISValidSettings = !settings.mBusmasterIsOnline;
     if (settings.mBusmasterIsOnline == FALSE) {
-        if (m_podMsgWndThread != nullptr) { //Msg window
+        if (m_podMsgWndThread != nullptr && ::IsWindow(m_podMsgWndThread->hGetHandleMsgWnd(LIN))) { //Msg window
             ::SendMessage(m_podMsgWndThread->hGetHandleMsgWnd(LIN), WM_NOTIFICATION_FROM_OTHER,
                           eWINID_MSG_WND_GET_BUFFER_DETAILS, (LPARAM)m_anMsgBuffSize[LIN]);
+        }
+        else
+        {
+            TRACE0("LIN message window handle is unavailable while reading buffer settings.\n");
         }
         settings.mBufferSettings.mAppendSize = m_anMsgBuffSize[LIN][defAPPEND_DATA_INDEX];
         settings.mBufferSettings.mOverWriteSize = m_anMsgBuffSize[LIN][defOVERWRITE_DATE_INDEX];
@@ -1976,7 +2072,15 @@ void CMainFrame::OnConfigMessageDisplayLin()
     }
 
     SFILTERAPPLIED_LIN sFilterAppliedLin;
-    ::SendMessage(m_podMsgWndThread->hGetHandleMsgWnd(LIN), WM_GET_FILTER_DETAILS, (WPARAM)&sFilterAppliedLin, (LPARAM)LIN);
+    if (m_podMsgWndThread != nullptr && ::IsWindow(m_podMsgWndThread->hGetHandleMsgWnd(LIN)))
+    {
+        ::SendMessage(m_podMsgWndThread->hGetHandleMsgWnd(LIN), WM_GET_FILTER_DETAILS, (WPARAM)&sFilterAppliedLin, (LPARAM)LIN);
+    }
+    else
+    {
+        TRACE0("LIN message window handle is unavailable while reading filter settings.\n");
+        sFilterAppliedLin.vClear();
+    }
     std::map<std::string, bool> filtersApplied;
     for (uint32_t i = 0; i < sFilterAppliedLin.m_ushTotal; i++) {
         settings.mFilterDetails.mFitersApplied[sFilterAppliedLin.m_psFilters[i].m_sFilterName.m_acFilterName] = static_cast<bool>(sFilterAppliedLin.m_psFilters[i].m_bEnabled);
@@ -2002,6 +2106,7 @@ void CMainFrame::OnConfigMessageDisplayLin()
 
     //Invoke Settings Dialog
     MessageWindowSettingsDialog settingsDlg(defCONFIG_MSG_DISPLAY_LIN, &settings);
+    TRACE0("Opening LIN message display settings dialog.\n");
     BOOL bReturnVal = settingsDlg.DoModal();
     if (bReturnVal == IDOK) {
         ApplyFilterConfigToMsgWnd(settings.mFilterDetails.mFitersApplied, m_sFilterAppliedLIN);
@@ -2010,11 +2115,13 @@ void CMainFrame::OnConfigMessageDisplayLin()
         m_anMsgBuffSize[LIN][defOVERWRITE_DATE_INDEX] = settings.mBufferSettings.mOverWriteSize;
         m_anMsgBuffSize[LIN][defDISPLAY_UPDATE_DATA_INDEX] = settings.mBufferSettings.mDisplayUpdateRate;
 
-        if (nullptr != m_podMsgWndThread && settings.mBusmasterIsOnline == false) {
+        if (nullptr != m_podMsgWndThread && settings.mBusmasterIsOnline == false && ::IsWindow(m_podMsgWndThread->hGetHandleMsgWnd(LIN))) {
             ::SendMessage(m_podMsgWndThread->hGetHandleMsgWnd(LIN), WM_NOTIFICATION_FROM_OTHER,
                           eWINID_MSG_WND_GET_BUFFER_DETAILS, (LPARAM)m_anMsgBuffSize[LIN]);
         }
-        ::SendMessage(m_podMsgWndThread->hGetHandleMsgWnd(LIN), WM_INVALIDATE_LIST_DISPLAY, 0, 0);
+        if (m_podMsgWndThread != nullptr && ::IsWindow(m_podMsgWndThread->hGetHandleMsgWnd(LIN))) {
+            ::SendMessage(m_podMsgWndThread->hGetHandleMsgWnd(LIN), WM_INVALIDATE_LIST_DISPLAY, 0, 0);
+        }
     }
 }
 
@@ -3145,6 +3252,17 @@ void CMainFrame::OnUpdateConfigureDatabaseNew(CCmdUI* pCmdUI)
 
 /******************************************************************************
     Functionality    :  Called by the framework to enable or disable
+                        Database Open menu option.
+******************************************************************************/
+void CMainFrame::OnUpdateConfigureDatabaseOpenActive(CCmdUI* pCmdUI)
+{
+    const bool bDbManagerAvailable =
+        (m_ouBusmasterNetwork != nullptr) && m_ouBusmasterNetwork->isDbManagerAvailable();
+    pCmdUI->Enable(bDbManagerAvailable && !theApp.pouGetFlagsPtr()->nGetFlagStatus(DBOPEN));
+}
+
+/******************************************************************************
+    Functionality    :  Called by the framework to enable or disable
                         Database Save menu option.
 ******************************************************************************/
 void CMainFrame::OnUpdateConfigureDatabaseSave(CCmdUI* pCmdUI)
@@ -3159,6 +3277,13 @@ void CMainFrame::OnUpdateConfigureDatabaseSave(CCmdUI* pCmdUI)
 void CMainFrame::OnUpdateConfigureDatabaseSaveas(CCmdUI* pCmdUI)
 {
     pCmdUI->Enable(theApp.pouGetFlagsPtr()->nGetFlagStatus(DBOPEN));
+}
+
+void CMainFrame::OnUpdateLDFEditor(CCmdUI* pCmdUI)
+{
+    const bool bDbManagerAvailable =
+        (m_ouBusmasterNetwork != nullptr) && m_ouBusmasterNetwork->isDbManagerAvailable();
+    pCmdUI->Enable(bDbManagerAvailable);
 }
 
 /******************************************************************************
@@ -8250,16 +8375,45 @@ BOOL CMainFrame::OnHelpInfo(HELPINFO* pHelpInfo)
 ******************************************************************************/
 void CMainFrame::WinHelp(DWORD , UINT )
 {
-    // Get Application Help File Path
-    CString omStrPath = theApp.m_pszHelpFilePath;
-    // Replace .hlp with .chm
-    int nIndex = omStrPath.ReverseFind(PERIOD);
-    // Extract string before the extension
-    omStrPath = omStrPath.Mid(0, nIndex);
-    // Add New Extension
-    omStrPath = omStrPath + ".chm";
-    // Make it as content display always
-    ::HtmlHelp(nullptr, omStrPath, HH_DISPLAY_TOPIC, 0);
+    const CString runtimeDir = GetModuleDirectory();
+    const CString helpFile = runtimeDir + _T("\\BUSMASTER.chm");
+    if (PathFileExists(helpFile))
+    {
+        const CString helpPath = helpFile + _T("::/topics/Diagnostics_Main_Window.html");
+        if (::HtmlHelp(nullptr, helpPath, HH_DISPLAY_TOPIC, 0) != nullptr)
+        {
+            return;
+        }
+        ShellExecute(nullptr, _T("open"), helpFile, nullptr, runtimeDir, SW_SHOWNORMAL);
+        return;
+    }
+
+    TRACE1("Help file not found at %s\n", helpFile);
+    AfxMessageBox(_("Help file BUSMASTER.chm is missing from the application runtime folder."), MB_ICONWARNING | MB_OK);
+}
+
+void CMainFrame::OnHelp()
+{
+    CScopedResourceHandle resourceScope(AfxGetInstanceHandle());
+    const CString runtimeDir = GetModuleDirectory();
+    const CString helpFile = runtimeDir + _T("\\BUSMASTER.chm");
+    if (PathFileExists(helpFile))
+    {
+        const CString helpTopic = helpFile + _T("::/topics/Diagnostics_Main_Window.html");
+        if (::HtmlHelp(m_hWnd, helpTopic, HH_DISPLAY_TOPIC, 0) != nullptr)
+        {
+            return;
+        }
+        TRACE1("HtmlHelp failed for %s\n", helpTopic);
+        ShellExecute(m_hWnd, _T("open"), helpFile, nullptr, runtimeDir, SW_SHOWNORMAL);
+        return;
+    }
+    else
+    {
+        TRACE1("Help file not found at %s\n", helpFile);
+    }
+
+    AfxMessageBox(_("Failed to launch help."), MB_ICONWARNING | MB_OK);
 }
 
 /******************************************************************************
@@ -8374,6 +8528,7 @@ void CMainFrame::OnFileConverter()
 {
     try
     {
+        CScopedResourceHandle resourceScope(AfxGetInstanceHandle());
         // If window is already created and displayed then just bring it to front
         //m_hProcess = nullptr; //KSS
         CWnd* pWndCreated = IsWindowCreated();
@@ -8384,28 +8539,29 @@ void CMainFrame::OnFileConverter()
         }
 
         // Get the working directory
-        char acPath[MAX_PATH] = "";
-        GetModuleFileName( nullptr, acPath, MAX_PATH );
-        PathRemoveFileSpec(acPath);
-        CString strPath = acPath;
-        strPath += "\\FormatConverter.exe";
+        CString runtimeDir = GetModuleDirectory();
+        CString strPath = runtimeDir + _T("\\FormatConverter.exe");
 
         if(PathFileExists(strPath) == TRUE)
         {
-            // Launch the converter utility
-            PROCESS_INFORMATION sProcessInfo;
-            STARTUPINFO sStartInfo;
-
-            memset(&sProcessInfo, 0, sizeof(PROCESS_INFORMATION));
-            memset(&sStartInfo, 0, sizeof(STARTUPINFO));
-
-            INT nSuccess = CreateProcess(   strPath.GetBuffer(MAX_PATH), "", nullptr, nullptr,
-                                            true, CREATE_NO_WINDOW, nullptr, nullptr,
-                                            &sStartInfo, &sProcessInfo);
-            if (nSuccess != 0)
+            TRACE1("Launching Format Converter from %s\n", strPath);
+            UINT launchError = 0;
+            if (LaunchExecutable(strPath, CString(), runtimeDir, &launchError))
             {
-                m_hProcess = sProcessInfo.hProcess;
+                m_hProcess = nullptr;
             }
+            else
+            {
+                CString omMsg;
+                omMsg.Format(_("Unable to launch Format Converter. Error code: %u"), launchError);
+                TRACE1("%s\n", omMsg);
+                AfxMessageBox(omMsg, MB_ICONSTOP | MB_OK);
+            }
+        }
+        else
+        {
+            TRACE1("Format Converter executable not found at %s\n", strPath);
+            AfxMessageBox(_("Format Converter is missing from the application runtime folder."), MB_ICONSTOP | MB_OK);
         }
     }
     catch(...)
@@ -8417,6 +8573,10 @@ void CMainFrame::OnLDFEditor()
 {
     try
     {
+        if (m_ouBusmasterNetwork == nullptr || !m_ouBusmasterNetwork->isDbManagerAvailable()) {
+            AfxMessageBox(_("LDF Editor is unavailable in this x64 build because DBManager.dll is x86-only."), MB_ICONINFORMATION | MB_OK);
+            return;
+        }
         // Get the working directory
         char acPath[MAX_PATH] = "";
         GetModuleFileName( nullptr, acPath, MAX_PATH );
@@ -8564,13 +8724,19 @@ BOOL CALLBACK TerminateAppEnum( HWND hwnd, LPARAM lParam )
 ******************************************************************************/
 void CMainFrame::OnSaveImportDatabase()
 {
+    if (m_ouBusmasterNetwork == nullptr || !m_ouBusmasterNetwork->isDbManagerAvailable()) {
+        AfxMessageBox(_("Database import is unavailable in this x64 build because DBManager.dll is x86-only."), MB_ICONINFORMATION | MB_OK);
+        return;
+    }
     OnConfigDatabaseSave();
     dLoadDataBaseFile(m_omStrDatabaseName, FALSE);
 }
 
 void CMainFrame::OnUpdateSaveImportDatabase(CCmdUI* pCmdUI)
 {
-    pCmdUI->Enable( theApp.pouGetFlagsPtr()->nGetFlagStatus( DBOPEN ));
+    const bool bDbManagerAvailable =
+        (m_ouBusmasterNetwork != nullptr) && m_ouBusmasterNetwork->isDbManagerAvailable();
+    pCmdUI->Enable(bDbManagerAvailable && theApp.pouGetFlagsPtr()->nGetFlagStatus(DBOPEN));
 }
 
 /**
@@ -8583,6 +8749,10 @@ void CMainFrame::OnUpdateSaveImportDatabase(CCmdUI* pCmdUI)
 */
 void CMainFrame::OnSaveImportJ1939Database()
 {
+    if (m_ouBusmasterNetwork == nullptr || !m_ouBusmasterNetwork->isDbManagerAvailable()) {
+        AfxMessageBox(_("Database import is unavailable in this x64 build because DBManager.dll is x86-only."), MB_ICONINFORMATION | MB_OK);
+        return;
+    }
     OnJ1939DBSave();
     dLoadJ1939DBFile(m_podMsgSgWndJ1939->m_sDbParams.m_omDBPath,FALSE);
 }
@@ -8597,7 +8767,9 @@ void CMainFrame::OnSaveImportJ1939Database()
 */
 void CMainFrame::OnUpdateSaveImportJ1939Database(CCmdUI* pCmdUI)
 {
-    pCmdUI->Enable( theApp.pouGetFlagsPtr()->nGetFlagStatus( DBOPEN_J1939 ));
+    const bool bDbManagerAvailable =
+        (m_ouBusmasterNetwork != nullptr) && m_ouBusmasterNetwork->isDbManagerAvailable();
+    pCmdUI->Enable(bDbManagerAvailable && theApp.pouGetFlagsPtr()->nGetFlagStatus(DBOPEN_J1939));
 }
 
 /******************************************************************************
@@ -13518,18 +13690,41 @@ void CMainFrame::OnActivateJ1939()
 {
     HRESULT Result = S_FALSE;
     bool bActivateStatus = false;
+    CBaseNodeSim* pJ1939NodeSim = GetIJ1939NodeSim();
     if ((nullptr == sg_pouIJ1939DIL) && (nullptr == sg_pouIJ1939Logger))
     {
+        TRACE0("Activating J1939 interfaces.\n");
         Result = ProcessJ1939Interfaces();
-        GetIJ1939NodeSim()->NS_SetJ1939ActivationStatus(true);
-        m_podMsgWndThread->vModifyVisibilityStatus(SW_SHOW, J1939);
-        bActivateStatus = true;
+        if (Result == S_OK)
+        {
+            if (pJ1939NodeSim != nullptr)
+            {
+                pJ1939NodeSim->NS_SetJ1939ActivationStatus(true);
+            }
+            if (m_podMsgWndThread != nullptr)
+            {
+                m_podMsgWndThread->vModifyVisibilityStatus(SW_SHOW, J1939);
+                bActivateStatus = true;
+            }
+            else
+            {
+                TRACE0("Message window thread is unavailable during J1939 activation.\n");
+                Result = S_FALSE;
+            }
+        }
     }
     else
     {
+        TRACE0("Deactivating J1939 interfaces.\n");
         Result = DeselectJ1939Interfaces();
-        GetIJ1939NodeSim()->NS_SetJ1939ActivationStatus(false);
-        m_podMsgWndThread->vModifyVisibilityStatus(SW_HIDE, J1939);
+        if (pJ1939NodeSim != nullptr)
+        {
+            pJ1939NodeSim->NS_SetJ1939ActivationStatus(false);
+        }
+        if (m_podMsgWndThread != nullptr)
+        {
+            m_podMsgWndThread->vModifyVisibilityStatus(SW_HIDE, J1939);
+        }
     }
 
 	setConnectStateJ1939(bActivateStatus);
@@ -13548,7 +13743,11 @@ void CMainFrame::OnActivateJ1939()
         OnActionJ1939Online();
     }
 
-    ASSERT(Result == S_OK);
+    if (Result != S_OK)
+    {
+        TRACE1("J1939 activation/deactivation returned 0x%08X.\n", static_cast<unsigned int>(Result));
+        AfxMessageBox(_("J1939 activation failed. See the trace window for details."), MB_ICONWARNING | MB_OK);
+    }
 }
 
 void CMainFrame::OnUpdateActivateJ1939(CCmdUI* pCmdUI)
@@ -13979,6 +14178,13 @@ void CMainFrame::OnUpdateJ1939DBNew(CCmdUI* pCmdUI)
     pCmdUI->Enable( !CMsgSignalDBWnd::sm_bValidJ1939Wnd );
 }
 
+void CMainFrame::OnUpdateJ1939DBOpen(CCmdUI* pCmdUI)
+{
+    const bool bDbManagerAvailable =
+        (m_ouBusmasterNetwork != nullptr) && m_ouBusmasterNetwork->isDbManagerAvailable();
+    pCmdUI->Enable(bDbManagerAvailable && !CMsgSignalDBWnd::sm_bValidJ1939Wnd);
+}
+
 static void vGetNewJ1939DBName(CString& omString)
 {
     UINT unCount = 1;
@@ -14101,6 +14307,10 @@ void CMainFrame::OnJ1939DBNew()
 
 void CMainFrame::OnJ1939DBOpen()
 {
+    if (m_ouBusmasterNetwork == nullptr || !m_ouBusmasterNetwork->isDbManagerAvailable()) {
+        AfxMessageBox(_("J1939 database import is unavailable in this x64 build because DBManager.dll is x86-only."), MB_ICONINFORMATION | MB_OK);
+        return;
+    }
     // Check if any database is already open
     if (CMsgSignalDBWnd::sm_bValidJ1939Wnd == TRUE) {
         // Some database is open
@@ -14301,6 +14511,10 @@ void CMainFrame::OnUpdateJ1939DBClose(CCmdUI* pCmdUI)
 
 void CMainFrame::OnJ1939DBAssociate()
 {
+    if (m_ouBusmasterNetwork == nullptr || !m_ouBusmasterNetwork->isDbManagerAvailable()) {
+        AfxMessageBox(_("J1939 database import is unavailable in this x64 build because DBManager.dll is x86-only."), MB_ICONINFORMATION | MB_OK);
+        return;
+    }
     CStringArray strFilePathArray;
     // Display a open file dialog
     CFileDialog fileDlg(TRUE,      // Open File dialog
@@ -14485,6 +14699,7 @@ void CMainFrame::OnConfigureMessagedisplayJ1939()
     settings.mMessageAttribute.mMsgCount = unIndex;
     //Invoke Settings Dialog
     MessageWindowSettingsDialog settingsDlg(defCONFIG_MSG_DISPLAY_J1939, &settings);
+    TRACE0("Opening J1939 message display settings dialog.\n");
     if (IDOK == settingsDlg.DoModal())
     {
         ::SendMessage(m_podMsgWndThread->hGetHandleMsgWnd(J1939), WM_INVALIDATE_LIST_DISPLAY, 0, 0);
@@ -14494,32 +14709,24 @@ void CMainFrame::OnConfigureMessagedisplayJ1939()
 
 void CMainFrame::OnAutomationTSEditor(void)
 {
-	try {
-		// Get the working directory
-		char acPath[MAX_PATH] = "";
-		GetModuleFileName(nullptr, acPath, MAX_PATH);
-		PathRemoveFileSpec(acPath);
-		CString strPath = acPath;
-		strPath += "\\TestSetupEditorGUI.exe";
+    CScopedResourceHandle resourceScope(AfxGetInstanceHandle());
+    const CString runtimeDir = GetModuleDirectory();
+    const CString editorPath = runtimeDir + _T("\\TestSetupEditorGUI.exe");
+    if (PathFileExists(editorPath) != TRUE)
+    {
+        TRACE1("Test Automation Editor not found at %s\n", editorPath);
+        AfxMessageBox(_("Test Automation Editor is missing from the application runtime folder."), MB_ICONSTOP | MB_OK);
+        return;
+    }
 
-		if (PathFileExists(strPath) == TRUE) {
-			// Launch the converter utility
-			PROCESS_INFORMATION sProcessInfo;
-			STARTUPINFO sStartInfo;
-
-			memset(&sProcessInfo, 0, sizeof(PROCESS_INFORMATION));
-			memset(&sStartInfo, 0, sizeof(STARTUPINFO));
-
-			int nSuccess = CreateProcess(strPath.GetBuffer(MAX_PATH), "",
-				nullptr, nullptr, false, CREATE_NO_WINDOW, nullptr, nullptr,
-				&sStartInfo, &sProcessInfo);
-			if (!nSuccess) {
-				AfxMessageBox("Unable to launch Test Automation Editor.", MB_ICONSTOP | MB_OK);
-			}
-		}
-	} catch (...)
-	{
-	}
+    UINT launchError = 0;
+    if (!LaunchExecutable(editorPath, CString(), runtimeDir, &launchError))
+    {
+        CString omMsg;
+        omMsg.Format(_("Unable to launch Test Automation Editor. Error code: %u"), launchError);
+        TRACE1("%s\n", omMsg);
+        AfxMessageBox(omMsg, MB_ICONSTOP | MB_OK);
+    }
 }
 
 bool CMainFrame::bWaitForNSCodeGenStatus(ETYPE_BUS eBusType)

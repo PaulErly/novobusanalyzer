@@ -96,24 +96,36 @@ void SetDefaultWindowPos(WINDOWPLACEMENT& sTxWndPlacement)
 HRESULT nShowScheduleConfigDlg(void* pParentWnd, IBMNetWorkGetService* pClusterConfig)
 {
     HRESULT hResult = S_FALSE;
+    HINSTANCE hOldResource = AfxGetResourceHandle();
+    AfxSetResourceHandle(AfxGetInstanceHandle());
 
     if(g_pomLINScheduleCfgDlg == NULL)
     {
         g_pomLINScheduleCfgDlg = new CScheduleTableCfgDlg(pClusterConfig, (CWnd*)pParentWnd);
 
-        hResult = g_pomLINScheduleCfgDlg->Create(IDD_DLG_LIN_SCHEDULE_CONFIG, (CWnd*)pParentWnd);
-        //g_pomLINScheduleCfgDlg->SetParent((CWnd*)pParentWnd);
-        WINDOWPLACEMENT wndPos;
-        CLINScheduleDataStore::pGetLINSchedDataStore().vGetWindowPlacement(wndPos);
-        g_pomLINScheduleCfgDlg->SetWindowPlacement(&(wndPos));
-        g_pomLINScheduleCfgDlg->ShowWindow(SW_SHOW);
-        hResult = S_OK;
+        const BOOL bCreated = g_pomLINScheduleCfgDlg->Create(IDD_DLG_LIN_SCHEDULE_CONFIG, (CWnd*)pParentWnd);
+        if (bCreated == TRUE)
+        {
+            WINDOWPLACEMENT wndPos;
+            CLINScheduleDataStore::pGetLINSchedDataStore().vGetWindowPlacement(wndPos);
+            g_pomLINScheduleCfgDlg->SetWindowPlacement(&(wndPos));
+            g_pomLINScheduleCfgDlg->ShowWindow(SW_SHOW);
+            hResult = S_OK;
+        }
+        else
+        {
+            TRACE1("Failed to create LIN schedule configuration dialog (BOOL=%d).\n", bCreated);
+            delete g_pomLINScheduleCfgDlg;
+            g_pomLINScheduleCfgDlg = nullptr;
+            hResult = S_FALSE;
+        }
     }
     else
     {
         g_pomLINScheduleCfgDlg->ShowWindow(SW_SHOW);
     }
 
+    AfxSetResourceHandle(hOldResource);
     return hResult;
 }
 int nShowTxWindow(void* pParentWnd, ETYPE_BUS eBUS)

@@ -17,6 +17,8 @@
 #define BUSMASTER_UTILITY_COLUMNTREEWND_H_
 
 #include "ColumnTreeCtrl.h"
+#include "TXWindow/CCheckColumnTreeCtrl.h"
+class CCheckColumnTreeCtrl;
 
 class CColumnTreeWnd : public CWnd
 {
@@ -31,7 +33,12 @@ public:
 
     CTreeCtrl& GetTreeCtrl()
     {
-        return m_Tree;
+        return m_CheckTree;
+    }
+
+    CCheckColumnTreeCtrl& GetCheckTreeCtrl()
+    {
+        return m_CheckTree;
     }
 
     CHeaderCtrl& GetHeaderCtrl()
@@ -48,7 +55,8 @@ protected:
     void RepositionControls();
     int GetMaxColumnWidth(HTREEITEM hItem, int nColumn, int nDepth, BOOL bIgnoreCollapsed);
 
-    CColumnTreeCtrl m_Tree;
+    CCheckColumnTreeCtrl* m_pCheckTree = nullptr;
+    CCheckColumnTreeCtrl m_CheckTree;
     CHeaderCtrl m_Header;
     int m_cyHeader;
     int m_cxTotal;

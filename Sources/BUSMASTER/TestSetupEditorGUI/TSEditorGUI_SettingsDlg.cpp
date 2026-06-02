@@ -74,12 +74,30 @@ Modifications  :
 void CTSEditorSettingsDlg::DoDataExchange(CDataExchange* pDX)
 {
     CDialog::DoDataExchange(pDX);
-    DDX_Control(pDX, IDC_BTN_BKG, m_ouBkColorBtn);
-    DDX_Control(pDX, IDC_BTN_TXT, m_ouTxtColorBtn);
-    DDX_Check(pDX, IDC_AUTOSAVE, m_bQueryConfirm);
-    DDX_Control(pDX, IDC_ROW1_COL, m_Row1Color);
-    DDX_Control(pDX, IDC_ROW2_COL, m_Row2Color);
-    DDX_Control(pDX, ID_DEFAULT, m_omDefaultVal);
+    if (pDX->m_pDlgWnd != nullptr && ::GetDlgItem(pDX->m_pDlgWnd->GetSafeHwnd(), IDC_BTN_BKG) != nullptr)
+    {
+        DDX_Control(pDX, IDC_BTN_BKG, m_ouBkColorBtn);
+    }
+    if (pDX->m_pDlgWnd != nullptr && ::GetDlgItem(pDX->m_pDlgWnd->GetSafeHwnd(), IDC_BTN_TXT) != nullptr)
+    {
+        DDX_Control(pDX, IDC_BTN_TXT, m_ouTxtColorBtn);
+    }
+    if (pDX->m_pDlgWnd != nullptr && ::GetDlgItem(pDX->m_pDlgWnd->GetSafeHwnd(), IDC_AUTOSAVE) != nullptr)
+    {
+        DDX_Check(pDX, IDC_AUTOSAVE, m_bQueryConfirm);
+    }
+    if (pDX->m_pDlgWnd != nullptr && ::GetDlgItem(pDX->m_pDlgWnd->GetSafeHwnd(), IDC_ROW1_COL) != nullptr)
+    {
+        DDX_Control(pDX, IDC_ROW1_COL, m_Row1Color);
+    }
+    if (pDX->m_pDlgWnd != nullptr && ::GetDlgItem(pDX->m_pDlgWnd->GetSafeHwnd(), IDC_ROW2_COL) != nullptr)
+    {
+        DDX_Control(pDX, IDC_ROW2_COL, m_Row2Color);
+    }
+    if (pDX->m_pDlgWnd != nullptr && ::GetDlgItem(pDX->m_pDlgWnd->GetSafeHwnd(), ID_DEFAULT) != nullptr)
+    {
+        DDX_Control(pDX, ID_DEFAULT, m_omDefaultVal);
+    }
 }
 
 /******************************************************************************

@@ -66,11 +66,21 @@ BOOL CCheckColumnTreeCtrl::bCreateImageList()
 }
 int CCheckColumnTreeCtrl::nUpdateScheduleView()
 {
+    if (GetSafeHwnd() == nullptr)
+    {
+        TRACE0("Schedule tree control is not initialized.\n");
+        return -1;
+    }
     DeleteAllItems();
     SetImageList(&m_omImageList, TVSIL_NORMAL);
 
     SCheduleTableData* ouTableData = CLINScheduleDataStore::pGetLINSchedDataStore().m_ouTableData;
     IBMNetWorkGetService* ouClusterConfig = CLINScheduleDataStore::pGetLINSchedDataStore().pGetClusterConfig();
+    if (ouTableData == nullptr || ouClusterConfig == nullptr)
+    {
+        TRACE0("Schedule configuration data is unavailable.\n");
+        return -1;
+    }
     list<CSheduleTable>::iterator itrSchdTable;
     HTREEITEM hItemChannel = NULL,  hItemSchedule = NULL, hItemFrame = NULL;
     char chChannelName[255];
@@ -79,7 +89,11 @@ int CCheckColumnTreeCtrl::nUpdateScheduleView()
     sTreeData ouTreeItemData;
     int nChannels = 0;
 
-    ouClusterConfig->GetChannelCount(LIN, nChannels);
+    if (FAILED(ouClusterConfig->GetChannelCount(LIN, nChannels)))
+    {
+        TRACE0("Failed to read LIN channel count for schedule view.\n");
+        return -1;
+    }
     for(INT nIndex = 0; nIndex < nChannels; nIndex++)
     {
 
@@ -113,6 +127,11 @@ int CCheckColumnTreeCtrl::nUpdateScheduleView()
             }
 
             list<CScheduleCommands>::iterator itrFramelist = itrSchdTable->m_listCommands.begin();
+            if (itrFramelist == itrSchdTable->m_listCommands.end())
+            {
+                ++itrSchdTable;
+                continue;
+            }
 
             // Add Frames
             char chFrameName[512] = {0};

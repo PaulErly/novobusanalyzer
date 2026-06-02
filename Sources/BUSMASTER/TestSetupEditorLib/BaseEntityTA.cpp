@@ -344,6 +344,11 @@ Modifications  :
 ******************************************************************************/
 HRESULT CBaseEntityTA::SetDatabaseFile(CString& omstrDataBasePath)
 {
+    if (!m_ouDataBaseManager.mDbManagerAccess.isDbManagerAvailable())
+    {
+        AfxMessageBox(_("Database import is unavailable in this x64 build because DBManager.dll is x86-only."), MB_ICONINFORMATION | MB_OK);
+        return ERR_INVALID_DATABASE;
+    }
     if( EC_SUCCESS == m_ouDataBaseManager.FillDataStructureFromDatabaseFile(omstrDataBasePath.GetBuffer(0)))
     {
         return S_OK;

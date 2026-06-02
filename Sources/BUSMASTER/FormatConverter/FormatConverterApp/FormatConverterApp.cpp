@@ -38,6 +38,7 @@ static HINSTANCE ghLangInst=NULL;
 
 BOOL CFormatConverterApp::InitInstance()
 {
+    TRACE0("FormatConverter InitInstance entered.\n");
     // InitCommonControlsEx() is required on Windows XP if an application
     // manifest specifies use of ComCtl32.dll version 6 or later to enable
     // visual styles.  Otherwise, any window creation will fail.
@@ -59,7 +60,7 @@ BOOL CFormatConverterApp::InitInstance()
     int ret = ::GetModuleFileName(theApp.m_hInstance, szModuleFileName, MAX_PATH);
     if ( ret == 0 || ret == MAX_PATH )
     {
-        ASSERT(FALSE);
+        TRACE0("FormatConverter failed to query its module path.\n");
     }
     // Load resource-only language DLL. It will use the languages
     // detected above, take first available language,
@@ -70,6 +71,11 @@ BOOL CFormatConverterApp::InitInstance()
     {
         AfxSetResourceHandle( ghLangInst );
     }
+    else
+    {
+        TRACE0("FormatConverter did not load a language resource DLL.\n");
+    }
+    m_pszHelpFilePath = _tcsdup(_T("BUSMASTER.chm"));
     // End of Multiple Language support
 
     CWinApp::InitInstance();

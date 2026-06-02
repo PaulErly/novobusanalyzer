@@ -45,6 +45,7 @@ protected:
     DECLARE_MESSAGE_MAP()
 
 private:
+    bool m_bControlsReady = false;
 
     void vGetAutoResizeValues(double fSizeX, double fSizeY,double fToXPos, double fToYPos,_AUTORESIZE& autoResize);
 

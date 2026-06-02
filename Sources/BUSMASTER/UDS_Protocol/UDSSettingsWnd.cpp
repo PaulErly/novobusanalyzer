@@ -88,6 +88,22 @@ void vPopulateFCLength(CComboBox& omComboBox) {
   omComboBox.InsertString(1, "8");
 }
 
+template <typename TEdit>
+static void vSafeLimitText(TEdit& edit, int limit)
+{
+  if (::IsWindow(edit.GetSafeHwnd())) {
+    edit.LimitText(limit);
+  }
+}
+
+template <typename TEdit>
+static void vSafeSetReadOnly(TEdit& edit, BOOL readOnly)
+{
+  if (::IsWindow(edit.GetSafeHwnd())) {
+    edit.SetReadOnly(readOnly);
+  }
+}
+
 IMPLEMENT_DYNAMIC(CUDSSettingsWnd, CDialog)
 
 CUDSSettingsWnd::CUDSSettingsWnd(CWnd* pParent, CUDS_Protocol* pEngine)
@@ -266,30 +282,30 @@ void CUDSSettingsWnd::vInitializeUDSSettingsfFields() {
   m_omReqCanID.vSetBase(BASE_HEXADECIMAL);
   m_omRespCanID.vSetBase(BASE_HEXADECIMAL);
 
-  m_omReqCanID.LimitText(3);
-  m_omRespCanID.LimitText(3);
+  vSafeLimitText(m_omReqCanID, 3);
+  vSafeLimitText(m_omRespCanID, 3);
 
   m_omReqCanID.vSetSigned(false);
   m_omRespCanID.vSetSigned(false);
 
   m_omReqBroadcAddress.vSetBase(BASE_HEXADECIMAL);
   m_omReqBroadcAddress.vSetSigned(false);
-  m_omReqBroadcAddress.LimitText(3);
+  vSafeLimitText(m_omReqBroadcAddress, 3);
 
   m_omRespBroadcAddress.vSetBase(BASE_HEXADECIMAL);
   m_omRespBroadcAddress.vSetSigned(false);
-  m_omRespBroadcAddress.LimitText(3);
+  vSafeLimitText(m_omRespBroadcAddress, 3);
 
   m_omReqBaseAddress.vSetBase(BASE_HEXADECIMAL);
   m_omReqBaseAddress.vSetSigned(false);
-  m_omReqBaseAddress.LimitText(3);
+  vSafeLimitText(m_omReqBaseAddress, 3);
 
   m_omRespBaseAddress.vSetBase(BASE_HEXADECIMAL);
   m_omRespBaseAddress.vSetSigned(false);
-  m_omRespBaseAddress.LimitText(3);
+  vSafeLimitText(m_omRespBaseAddress, 3);
 
   m_STMin.vSetBase(BASE_HEXADECIMAL);
-  m_STMin.LimitText(2);
+  vSafeLimitText(m_STMin, 2);
   m_STMin.vSetSigned(false);
   m_STMin.vSetValue(0);
 
@@ -300,22 +316,22 @@ void CUDSSettingsWnd::vInitializeUDSSettingsfFields() {
   m_S3Client.vSetBase(BASE_DECIMAL);
   m_S3Client.vSetSigned(false);
   m_S3Client.vSetValue(2000);
-  m_S3Client.LimitText(6);
+  vSafeLimitText(m_S3Client, 6);
 
   m_S3_Server.vSetBase(BASE_DECIMAL);
   m_S3_Server.vSetSigned(false);
   m_S3_Server.vSetValue(5000);
-  m_S3_Server.LimitText(6);
+  vSafeLimitText(m_S3_Server, 6);
 
   P2TimeOut.vSetBase(BASE_DECIMAL);
   P2TimeOut.vSetSigned(false);
   P2TimeOut.vSetValue(250);
-  P2TimeOut.LimitText(5);
+  vSafeLimitText(P2TimeOut, 5);
 
   P2extended.vSetBase(BASE_DECIMAL);
   P2extended.vSetSigned(false);
   P2extended.vSetValue(2000);
-  P2extended.LimitText(6);
+  vSafeLimitText(P2extended, 6);
 
   vPopulateInterfaceComboBox(sg_asInterface, SIZE_INTERFACE_COMB,
                              m_omInterface);
@@ -356,17 +372,17 @@ void CUDSSettingsWnd::OnCbnSelchangeComboInterface() {
       m_omRespCanID.vSetValue(0x700);
       StringRespCanID = "700";
       StringReqCanID = "700";
-      m_omReqCanID.LimitText(3);
-      m_omRespCanID.LimitText(3);
+      vSafeLimitText(m_omReqCanID, 3);
+      vSafeLimitText(m_omRespCanID, 3);
 
-      m_omReqCanID.SetReadOnly(FALSE);
-      m_omRespCanID.SetReadOnly(FALSE);
+      vSafeSetReadOnly(m_omReqCanID, FALSE);
+      vSafeSetReadOnly(m_omRespCanID, FALSE);
 
-      m_omReqBaseAddress.SetReadOnly(TRUE);
-      m_omRespBaseAddress.SetReadOnly(TRUE);
+      vSafeSetReadOnly(m_omReqBaseAddress, TRUE);
+      vSafeSetReadOnly(m_omRespBaseAddress, TRUE);
 
-      m_omRespBroadcAddress.SetReadOnly(TRUE);
-      m_omReqBroadcAddress.SetReadOnly(TRUE);
+      vSafeSetReadOnly(m_omRespBroadcAddress, TRUE);
+      vSafeSetReadOnly(m_omReqBroadcAddress, TRUE);
 
       StringReqBaseAddress = " ";
       StringRespBaseAddress = " ";
@@ -375,8 +391,8 @@ void CUDSSettingsWnd::OnCbnSelchangeComboInterface() {
       m_omFCLength.SetCurSel(1);
     } break;
     case INTERFACE_EXTENDED_11: {
-      m_omReqCanID.SetReadOnly(TRUE);
-      m_omRespCanID.SetReadOnly(TRUE);
+      vSafeSetReadOnly(m_omReqCanID, TRUE);
+      vSafeSetReadOnly(m_omRespCanID, TRUE);
 
       m_omReqBaseAddress.vSetValue(0x600);
       m_omRespBaseAddress.vSetValue(0x600);
@@ -384,14 +400,14 @@ void CUDSSettingsWnd::OnCbnSelchangeComboInterface() {
       StringReqBaseAddress = "600";
       StringRespBaseAddress = "600";
 
-      m_omReqCanID.LimitText(3);
-      m_omRespCanID.LimitText(3);
+      vSafeLimitText(m_omReqCanID, 3);
+      vSafeLimitText(m_omRespCanID, 3);
 
-      m_omReqBaseAddress.SetReadOnly(FALSE);
-      m_omRespBaseAddress.SetReadOnly(FALSE);
+      vSafeSetReadOnly(m_omReqBaseAddress, FALSE);
+      vSafeSetReadOnly(m_omRespBaseAddress, FALSE);
 
-      m_omRespBroadcAddress.SetReadOnly(TRUE);
-      m_omReqBroadcAddress.SetReadOnly(TRUE);
+      vSafeSetReadOnly(m_omRespBroadcAddress, TRUE);
+      vSafeSetReadOnly(m_omReqBroadcAddress, TRUE);
 
       StringRespCanID = " ";
       StringReqCanID = " ";
@@ -401,42 +417,42 @@ void CUDSSettingsWnd::OnCbnSelchangeComboInterface() {
 
     } break;
     case INTERFACE_NORMAL_ISO_29: {
-      m_omReqCanID.LimitText(8);
-      m_omRespCanID.LimitText(8);
+      vSafeLimitText(m_omReqCanID, 8);
+      vSafeLimitText(m_omRespCanID, 8);
       m_omReqCanID.vSetValue(0x1BC00000);
       m_omRespCanID.vSetValue(0x1BC00000);
       StringRespCanID = "1BC00000";
       StringReqCanID = "1BC00000";
 
-      m_omReqCanID.SetReadOnly(FALSE);
-      m_omRespCanID.SetReadOnly(FALSE);
+      vSafeSetReadOnly(m_omReqCanID, FALSE);
+      vSafeSetReadOnly(m_omRespCanID, FALSE);
 
-      m_omReqBaseAddress.SetReadOnly(TRUE);
-      m_omRespBaseAddress.SetReadOnly(TRUE);
+      vSafeSetReadOnly(m_omReqBaseAddress, TRUE);
+      vSafeSetReadOnly(m_omRespBaseAddress, TRUE);
 
-      m_omRespBroadcAddress.SetReadOnly(TRUE);
-      m_omReqBroadcAddress.SetReadOnly(TRUE);
+      vSafeSetReadOnly(m_omRespBroadcAddress, TRUE);
+      vSafeSetReadOnly(m_omReqBroadcAddress, TRUE);
 
       StringReqBaseAddress = " ";
       StringRespBaseAddress = " ";
 
     } break;
     case INTERFACE_NORMAL_J1939_29: {
-      m_omReqCanID.LimitText(8);
-      m_omRespCanID.LimitText(8);
+      vSafeLimitText(m_omReqCanID, 8);
+      vSafeLimitText(m_omRespCanID, 8);
       m_omReqCanID.vSetValue(0x18DA0000);
       m_omRespCanID.vSetValue(0x18DA0000);
       StringRespCanID = "18DA0000";
       StringReqCanID = "18DA0000";
 
-      m_omReqCanID.SetReadOnly(FALSE);
-      m_omRespCanID.SetReadOnly(FALSE);
+      vSafeSetReadOnly(m_omReqCanID, FALSE);
+      vSafeSetReadOnly(m_omRespCanID, FALSE);
 
-      m_omReqBaseAddress.SetReadOnly(TRUE);
-      m_omRespBaseAddress.SetReadOnly(TRUE);
+      vSafeSetReadOnly(m_omReqBaseAddress, TRUE);
+      vSafeSetReadOnly(m_omRespBaseAddress, TRUE);
 
-      m_omRespBroadcAddress.SetReadOnly(TRUE);
-      m_omReqBroadcAddress.SetReadOnly(TRUE);
+      vSafeSetReadOnly(m_omRespBroadcAddress, TRUE);
+      vSafeSetReadOnly(m_omReqBroadcAddress, TRUE);
 
       StringReqBaseAddress = " ";
       StringRespBaseAddress = " ";

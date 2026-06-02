@@ -237,6 +237,10 @@ ERRORCODE BMNetwork::ManageClientForDbChanges(IDbChangeListner* newListner,
 
 ERRORCODE BMNetwork::ParseDbFile(std::string strFileName, ETYPE_BUS clusterType,
                                  std::list<ICluster*>& ouClusterList) {
+  if (!mDbManagerAcessor.isDbManagerAvailable()) {
+    TRACE0("DBManager.dll is unavailable; database parsing is disabled.\n");
+    return ERR_NOT_SUPPORTED;
+  }
   std::list<std::string> strFile;
   std::list<ClusterResult> ouClusterResult;
 

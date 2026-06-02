@@ -44,7 +44,7 @@
 #include <stdlib.h>         // standard library definitions
 
 #include <Utility/XMLUtils.h>
-#import <msxml6.dll>
+#import "C:\\Windows\\System32\\msxml6.dll"
 #include <locale.h>
 #include "IBusMasterKernel.h"
 

@@ -50,9 +50,11 @@ IMPLEMENT_DYNCREATE(CMsgFilterConfigPage, CPropertyPage)
 *******************************************************************************/
 
 CMsgFilterConfigPage::CMsgFilterConfigPage(std::string caption, filterDetails* filterDetails, HWND /*hMsgWnd*/)
-    :CPropertyPage(CMsgFilterConfigPage::IDD, IDS_PPAGE_TITLE_MSG_FILTER), mCaption(caption)
+    :CPropertyPage(CMsgFilterConfigPage::IDD), mCaption(caption)
 {
     mFilterDetails = filterDetails;
+    m_psp.dwFlags |= PSP_USETITLE;
+    m_psp.pszTitle = _T("Filter");
 }
 /*******************************************************************************
   Function Name  : CMsgFilterConfigPage
@@ -64,13 +66,15 @@ CMsgFilterConfigPage::CMsgFilterConfigPage(std::string caption, filterDetails* f
   Modifications  :
 *******************************************************************************/
 CMsgFilterConfigPage::CMsgFilterConfigPage() :
-    CPropertyPage(CMsgFilterConfigPage::IDD, IDS_PPAGE_TITLE_MSG_FILTER )
+    CPropertyPage(CMsgFilterConfigPage::IDD )
 {
     //{{AFX_DATA_INIT(CMsgFilterConfigPage)
     // NOTE: the ClassWizard will add member initialization here
     //}}AFX_DATA_INIT
     m_hMsgWnd = nullptr;
     m_psFilterConfigured = nullptr;
+    m_psp.dwFlags |= PSP_USETITLE;
+    m_psp.pszTitle = _T("Filter");
 }
 /*******************************************************************************
   Function Name  : ~CMsgFilterConfigPage
@@ -99,9 +103,9 @@ CMsgFilterConfigPage::~CMsgFilterConfigPage()
 void CMsgFilterConfigPage::DoDataExchange(CDataExchange* pDX)
 {
     CPropertyPage::DoDataExchange(pDX);
-    //{{AFX_DATA_MAP(CMsgFilterConfigPage)
-    DDX_Control(pDX, IDC_LST_DISPLAY_FILTER_LIST, m_omLstcFilterList);
-    //}}AFX_DATA_MAP
+    // Avoid DDX_Control here for the same reason as the message display pages:
+    // the modern runtime can bind the dialog under a different resource handle,
+    // and manual attachment in OnInitDialog is more robust than DDX.
 }
 
 
@@ -123,9 +127,22 @@ END_MESSAGE_MAP()
 *******************************************************************************/
 BOOL CMsgFilterConfigPage::OnInitDialog()
 {
-    CPropertyPage::OnInitDialog();
+    TRACE0("MsgFilterConfigPage::OnInitDialog\n");
+    HINSTANCE hOldResource = AfxGetResourceHandle();
+    AfxSetResourceHandle(AfxGetInstanceHandle());
+    CDialog::OnInitDialog();
+    CWnd* pFilterList = GetDlgItem(IDC_LST_DISPLAY_FILTER_LIST);
+    if (pFilterList == nullptr || !::IsWindow(pFilterList->GetSafeHwnd()) || !m_omLstcFilterList.SubclassWindow(pFilterList->GetSafeHwnd()))
+    {
+        TRACE0("Message filter list control is missing from the dialog template.\n");
+        AfxMessageBox(_("Unable to open the message filter settings."), MB_ICONSTOP | MB_OK);
+        return FALSE;
+    }
     // Create Image List
-    bCreateImageList();
+    if (!bCreateImageList())
+    {
+        TRACE0("Failed to create the message filter image list.\n");
+    }
     // Create Filter List UI
     vCreateFilterUIList();
 
@@ -135,6 +152,8 @@ BOOL CMsgFilterConfigPage::OnInitDialog()
     vInitFilterUIList();
     // Update Title
     SetWindowText( _(defSTR_WINDOW_TITLE) );
+
+    AfxSetResourceHandle(hOldResource);
 
     return TRUE;  // return TRUE unless you set the focus to a control
     // EXCEPTION: OCX Property Pages should return FALSE
@@ -177,6 +196,11 @@ BOOL CMsgFilterConfigPage::bCreateImageList()
 *******************************************************************************/
 void CMsgFilterConfigPage::vCreateFilterUIList()
 {
+    if (m_omLstcFilterList.GetSafeHwnd() == nullptr)
+    {
+        TRACE0("Message filter list control is not created.\n");
+        return;
+    }
     // Create One Colunm "Filter Name"
     m_omLstcFilterList.InsertColumn(0, _(defSTR_FILTER_NAME_COLUMN) );
     // Set Image List if list is valid
@@ -226,6 +250,11 @@ void CMsgFilterConfigPage::vInitFilterDataList()
 *******************************************************************************/
 void CMsgFilterConfigPage::vInitFilterUIList()
 {
+    if (m_omLstcFilterList.GetSafeHwnd() == nullptr || mFilterDetails == nullptr)
+    {
+        TRACE0("Message filter UI list cannot be initialized.\n");
+        return;
+    }
     // Remove existing items if any
     m_omLstcFilterList.DeleteAllItems();
 

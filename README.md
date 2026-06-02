@@ -52,8 +52,23 @@ and fails if any deployed DLL is not x64. Do not manually copy DLLs from
 
 The repository does not include the source or an x64 binary for
 `DBManager.dll`; its bundled copy is x86-only and is intentionally excluded.
-The x64 application runs without database import support. Install an
-x64-compatible `DBManager.dll` beside the executable to enable database import.
+In the x64 build, CAN database import uses the in-repo DBC converter path,
+which converts `.dbc` files into the same in-memory `sMESSAGE` / `sSIGNALS`
+database structures that the legacy loader populated. J1939 database import
+and the LDF Editor still depend on `DBManager.dll` and are disabled with a
+clear message. Install an x64-compatible `DBManager.dll` beside the
+executable to re-enable those legacy workflows.
+
+Supported x64 CAN database flow:
+- `.dbc` files are accepted.
+- Messages, signals, start bits, lengths, byte order, scale, offset, min/max,
+  units, and enumerated values are preserved through the converter.
+- Unsupported database formats fail with a user-visible message instead of a
+  silent DLL load error.
+
+The deploy step also copies `BUSMASTER.chm` from `Sources/BUSMASTER/BIN/Release`
+into the runtime folder so the Help menu and the Test Automation Editor help
+link can resolve locally.
 
 Run the selected configuration directly:
 
@@ -61,3 +76,14 @@ Run the selected configuration directly:
 .\build_modern\Sources\BUSMASTER\Application\Debug\NovoBusAnalyzer.exe
 .\build_modern\Sources\BUSMASTER\Application\Release\NovoBusAnalyzer.exe
 ```
+
+Quick smoke checklist:
+
+1. Start the matching `Debug` or `Release` exe from `build_modern`.
+2. Open `Format Converter` and confirm at least one converter tab is loaded.
+3. Open `Test Automation Editor` and verify the editor window appears.
+4. Open `Help` and confirm `BUSMASTER.chm` launches.
+5. Click `J1939 -> Activate` and confirm the trace window reports progress
+   instead of freezing.
+6. Open the diagnostics and LIN schedule dialogs and confirm they appear
+   without an MFC assertion.

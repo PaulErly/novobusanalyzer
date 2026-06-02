@@ -83,8 +83,14 @@ Modifications  :
 void CPropertyView::DoDataExchange(CDataExchange* pDX)
 {
     CFormView::DoDataExchange(pDX);
-    DDX_Control(pDX, IDC_PROPERTYLIST, m_omPropertyList);
-    DDX_Text(pDX, IDC_EDITHELP, m_omstrHelpString);
+    if (pDX->m_pDlgWnd != nullptr && ::GetDlgItem(pDX->m_pDlgWnd->GetSafeHwnd(), IDC_PROPERTYLIST) != nullptr)
+    {
+        DDX_Control(pDX, IDC_PROPERTYLIST, m_omPropertyList);
+    }
+    if (pDX->m_pDlgWnd != nullptr && ::GetDlgItem(pDX->m_pDlgWnd->GetSafeHwnd(), IDC_EDITHELP) != nullptr)
+    {
+        DDX_Text(pDX, IDC_EDITHELP, m_omstrHelpString);
+    }
 }
 HRESULT CPropertyView::onMsg(LPARAM,WPARAM)
 {
