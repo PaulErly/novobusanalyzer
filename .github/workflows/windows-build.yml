@@ -1,0 +1,138 @@
+name: Windows Build
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    defaults:
+      run:
+        shell: powershell
+
+    env:
+      BUILD_DIR: build_ci
+      QT_VERSION: 6.11.1
+      QT_ARCH: win64_msvc2022_64
+      VCPKG_BINARY_SOURCES: clear;x-gha,readwrite
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Qt
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: ${{ env.QT_VERSION }}
+          host: windows
+          target: desktop
+          arch: ${{ env.QT_ARCH }}
+          modules: qtmultimedia qt5compat
+          cache: true
+
+      - name: Locate vcpkg
+        id: vcpkg
+        run: |
+          $vcpkgRoot = "${env:VCPKG_INSTALLATION_ROOT}"
+          if ([string]::IsNullOrWhiteSpace($vcpkgRoot)) {
+            $candidate = Join-Path $env:ProgramFiles 'vcpkg'
+            if (Test-Path $candidate) {
+              $vcpkgRoot = $candidate
+            }
+          }
+          if ([string]::IsNullOrWhiteSpace($vcpkgRoot) -or -not (Test-Path (Join-Path $vcpkgRoot 'scripts\buildsystems\vcpkg.cmake'))) {
+            throw 'vcpkg was not found on the runner.'
+          }
+          "root=$vcpkgRoot" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+
+      - name: Configure Debug
+        run: |
+          cmake -S . -B $env:BUILD_DIR `
+            -G "Visual Studio 17 2022" `
+            -A x64 `
+            -DQt6_DIR="${env:Qt6_DIR}" `
+            -DCMAKE_TOOLCHAIN_FILE="${{ steps.vcpkg.outputs.root }}\scripts\buildsystems\vcpkg.cmake"
+
+      - name: Build Debug
+        run: cmake --build $env:BUILD_DIR --config Debug -- /m:1
+
+      - name: Build Release
+        run: cmake --build $env:BUILD_DIR --config Release -- /m:1
+
+      - name: Validate runtime outputs
+        run: |
+          $dbgDir = Join-Path $env:BUILD_DIR 'Sources\BUSMASTER\Application\Debug'
+          $relDir = Join-Path $env:BUILD_DIR 'Sources\BUSMASTER\Application\Release'
+
+          $required = @(
+            Join-Path $dbgDir 'NovoBusAnalyzer.exe'
+            Join-Path $relDir 'NovoBusAnalyzer.exe'
+            Join-Path $dbgDir 'ConverterPlugins\DBC2DBFConverter.dll'
+            Join-Path $dbgDir 'ConverterPlugins\DBC2DBFConverterLibrary.dll'
+            Join-Path $relDir 'ConverterPlugins\DBC2DBFConverter.dll'
+            Join-Path $relDir 'ConverterPlugins\DBC2DBFConverterLibrary.dll'
+            Join-Path $dbgDir 'BUSMASTER.chm'
+            Join-Path $relDir 'BUSMASTER.chm'
+            'Tests\Samples\CAN\dbc_smoke.dbc'
+          )
+
+          foreach ($path in $required) {
+            if (-not (Test-Path $path)) {
+              throw "Missing expected file: $path"
+            }
+          }
+
+      - name: Verify DBC converter is x64
+        run: |
+          function Get-PeMachine {
+            param([string]$Path)
+            $fs = [System.IO.File]::OpenRead($Path)
+            try {
+              $br = New-Object System.IO.BinaryReader($fs)
+              $fs.Seek(0x3C, [System.IO.SeekOrigin]::Begin) | Out-Null
+              $peOffset = $br.ReadInt32()
+              $fs.Seek($peOffset + 4, [System.IO.SeekOrigin]::Begin) | Out-Null
+              return $br.ReadUInt16()
+            }
+            finally {
+              $fs.Dispose()
+            }
+          }
+
+          $dll = Join-Path $env:BUILD_DIR 'Sources\BUSMASTER\Application\Debug\ConverterPlugins\DBC2DBFConverter.dll'
+          $machine = Get-PeMachine -Path $dll
+          if ($machine -ne 0x8664) {
+            throw "DBC2DBFConverter.dll is not x64. Machine=0x{0:X4}" -f $machine
+          }
+          Write-Host "DBC2DBFConverter.dll machine=0x{0:X4}" -f $machine
+
+      - name: Upload Debug artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: busmaster-windows-debug
+          path: |
+            build_ci\Sources\BUSMASTER\Application\Debug
+            build_ci\Sources\BUSMASTER\FormatConverter\DBC2DBFConverter\Debug
+            build_ci\Sources\BUSMASTER\FormatConverter\DBC2DBFConverterLibrary\Debug
+            build_ci\Sources\BUSMASTER\FormatConverter\FormatConverterApp\Debug
+            build_ci\Sources\BUSMASTER\cmake\*.log
+          if-no-files-found: warn
+
+      - name: Upload Release artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: busmaster-windows-release
+          path: |
+            build_ci\Sources\BUSMASTER\Application\Release
+            build_ci\Sources\BUSMASTER\FormatConverter\DBC2DBFConverter\Release
+            build_ci\Sources\BUSMASTER\FormatConverter\DBC2DBFConverterLibrary\Release
+            build_ci\Sources\BUSMASTER\FormatConverter\FormatConverterApp\Release
+            build_ci\Sources\BUSMASTER\cmake\*.log
+          if-no-files-found: warn

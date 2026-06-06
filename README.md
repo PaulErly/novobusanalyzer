@@ -73,6 +73,23 @@ The deploy step also copies `BUSMASTER.chm` from `Sources/BUSMASTER/BIN/Release`
 into the runtime folder so the Help menu and the Test Automation Editor help
 link can resolve locally.
 
+## CI Windows Build
+
+The GitHub Actions workflow at `.github/workflows/windows-build.yml` validates
+that the modern x64 BUSMASTER build configures and compiles on a clean Windows
+runner using the closest available Microsoft toolchain on GitHub-hosted
+machines.
+
+It currently checks:
+- Debug x64 and Release x64 builds
+- runtime deployment for `NovoBusAnalyzer.exe`
+- deployment of `DBC2DBFConverter.dll` and `DBC2DBFConverterLibrary.dll`
+- x64 PE architecture for `DBC2DBFConverter.dll`
+- presence of the CAN smoke sample DBC file
+
+It does not run the GUI interactively and it does not validate the
+DBManager-backed J1939, LDF, or Test Automation database workflows.
+
 Run the selected configuration directly:
 
 ```powershell
