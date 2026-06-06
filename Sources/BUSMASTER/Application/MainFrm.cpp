@@ -1162,10 +1162,15 @@ DESCRIPTION:    Closes a database file
 *******************************************************************************/
 LRESULT CMainFrame::OnCloseDatabase(WPARAM /*wParam*/, LPARAM /*lParam*/)
 {
-    OnCloseDatabase();
+    vCloseDatabaseWindow(true);
     return S_OK;
 }
 void CMainFrame::OnCloseDatabase()
+{
+    vCloseDatabaseWindow(true);
+}
+
+void CMainFrame::vCloseDatabaseWindow(bool bPromptSave)
 {
     if (nullptr == m_podMsgSgWnd) {
         return;
@@ -1175,7 +1180,7 @@ void CMainFrame::OnCloseDatabase()
     if (nullptr == pTempMsgSg) {
         return;
     }
-    if (pTempMsgSg->bGetModifiedFlag() == FALSE) {
+    if (bPromptSave && pTempMsgSg->bGetModifiedFlag() == FALSE) {
         UINT bRetVal = AfxMessageBox(_(ASK_SAVE_PROMPT),
                                      MB_YESNOCANCEL | MB_ICONQUESTION);
         if (bRetVal == IDYES) {
@@ -1194,17 +1199,13 @@ void CMainFrame::OnCloseDatabase()
         else if (bRetVal == IDCANCEL) {
             return;
         }
-
     }
-    else {
+    else if (bPromptSave == TRUE && vGetNewDatabaseFlag()) {
         // If the user just creates new database,
         // and closes the window
         // delete the file
-        if (vGetNewDatabaseFlag()) {
-            // This file is no longer required
-            CFile::Remove(m_podMsgSgWnd->m_sDbParams.m_omDBPath);
-            vSetNewDatabaseFlag(FALSE);
-        }
+        CFile::Remove(m_podMsgSgWnd->m_sDbParams.m_omDBPath);
+        vSetNewDatabaseFlag(FALSE);
     }
 
     // delete previously allocated memory if any
@@ -1266,7 +1267,7 @@ void CMainFrame::OnImportDatabase()
     CFileDialog fileDlg( TRUE,      // Open File dialog
                          "dbc",     // Default Extension,
                          nullptr,// Initial database file name.
-                         OFN_HIDEREADONLY | OFN_OVERWRITEPROMPT | OFN_ALLOWMULTISELECT,
+                         OFN_HIDEREADONLY | OFN_OVERWRITEPROMPT,
                          _("BUSMASTER CAN Database File(*.dbc)|*.dbc||"),
                          nullptr );
 

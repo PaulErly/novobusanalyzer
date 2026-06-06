@@ -819,8 +819,8 @@
 #define IDC_TREE_PROPERTIES             1246
 #define IDC_LIST_CHANNELS               1246
 #define IDC_STAT_161                    1247
-#define IDC_BTN_DBEDITOR_ACCEPT         1248
-#define IDC_BTN_DBEDITOR_CANCEL         1249
+#define IDC_BTN_DBEDITOR_ACCEPT         1266
+#define IDC_BTN_DBEDITOR_CANCEL         1267
 #define IDC_STAT_151                    1248
 #define IDC_STAT_MATRIX_RECT            1249
 #define IDC_BTN_DELETE_FILTER           1250

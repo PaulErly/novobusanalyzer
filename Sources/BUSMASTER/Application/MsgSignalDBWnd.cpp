@@ -479,15 +479,15 @@ void CMsgSignalDBWnd::OnAcceptAssociation()
 void CMsgSignalDBWnd::OnCancelAssociation()
 {
     vDiscardImportedAssociation();
+    if (CMainFrame* pFrame = static_cast<CMainFrame*>(AfxGetApp()->m_pMainWnd))
+    {
+        pFrame->vCloseDatabaseWindow(false);
+    }
 }
 
 void CMsgSignalDBWnd::vDiscardImportedAssociation()
 {
     CMainFrame* pFrame = static_cast<CMainFrame*>(AfxGetApp()->m_pMainWnd);
-    if (m_sDbParams.m_pouMsgSignalActiveDB != nullptr)
-    {
-        m_sDbParams.m_pouMsgSignalActiveDB->bDeAllocateMemoryInactive();
-    }
 
     if (m_sDbParams.m_pouMsgSignalImportedDBs != nullptr)
     {
