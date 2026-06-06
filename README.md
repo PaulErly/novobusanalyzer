@@ -87,11 +87,14 @@ runner using the closest available Microsoft toolchain on GitHub-hosted
 machines. It installs Qt 6.8.3 through `jurplel/install-qt-action`.
 
 It currently checks:
-- Debug x64 and Release x64 builds
+- Release x64 build only
 - runtime deployment for `NovoBusAnalyzer.exe`
 - deployment of `DBC2DBFConverter.dll` and `DBC2DBFConverterLibrary.dll`
 - x64 PE architecture for `DBC2DBFConverter.dll`
 - presence of the CAN smoke sample DBC file
+
+Debug x64 is intentionally left as a future TODO for the workflow so the CI
+job stays fast and focused on the shipping runtime path.
 
 It does not run the GUI interactively and it does not validate the
 DBManager-backed J1939, LDF, or Test Automation database workflows.

@@ -19,13 +19,18 @@ jobs:
       BUILD_DIR: build_ci
       QT_VERSION: 6.8.3
       QT_ARCH: win64_msvc2022_64
-      VCPKG_BINARY_SOURCES: clear;x-gha,readwrite
+      VCPKG_BINARY_SOURCES: clear;files,${{ github.workspace }}\vcpkg-bincache,readwrite
+      VCPKG_DOWNLOADS: ${{ github.workspace }}\vcpkg-downloads
+      VCPKG_BINARY_CACHE: ${{ github.workspace }}\vcpkg-bincache
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
           submodules: recursive
+
+      - name: Mark workflow start
+        run: Write-Host ("[{0}] workflow start" -f (Get-Date).ToString("o"))
 
       - name: Install Qt
         uses: jurplel/install-qt-action@v4
@@ -50,46 +55,63 @@ jobs:
           if ([string]::IsNullOrWhiteSpace($vcpkgRoot) -or -not (Test-Path (Join-Path $vcpkgRoot 'scripts\buildsystems\vcpkg.cmake'))) {
             throw 'vcpkg was not found on the runner.'
           }
+
           $isShallow = $false
           try {
             $isShallow = ((git -C $vcpkgRoot rev-parse --is-shallow-repository) -eq 'true')
           } catch {
             $isShallow = $false
           }
+
           if ($isShallow) {
             git -C $vcpkgRoot fetch --unshallow --tags origin
           } else {
             git -C $vcpkgRoot fetch --tags origin
           }
+
           "root=$vcpkgRoot" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
 
-      - name: Configure Debug
+      - name: Cache vcpkg downloads
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.VCPKG_DOWNLOADS }}
+          key: vcpkg-downloads-${{ runner.os }}-${{ env.QT_VERSION }}-${{ hashFiles('vcpkg.json', 'vcpkg-configuration.json', 'CMakeLists.txt', 'Sources/**/CMakeLists.txt', '**/cmake/*.cmake', '.github/workflows/windows-build.yml') }}
+          restore-keys: |
+            vcpkg-downloads-${{ runner.os }}-${{ env.QT_VERSION }}-
+
+      - name: Cache vcpkg binary cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.VCPKG_BINARY_CACHE }}
+          key: vcpkg-bincache-${{ runner.os }}-x64-windows-${{ env.QT_VERSION }}-${{ hashFiles('vcpkg.json', 'vcpkg-configuration.json', 'CMakeLists.txt', 'Sources/**/CMakeLists.txt', '**/cmake/*.cmake', '.github/workflows/windows-build.yml') }}
+          restore-keys: |
+            vcpkg-bincache-${{ runner.os }}-x64-windows-${{ env.QT_VERSION }}-
+
+      - name: Configure x64
         run: |
+          Write-Host ("[{0}] configure start" -f (Get-Date).ToString("o"))
           cmake -S . -B $env:BUILD_DIR `
             -G "Visual Studio 17 2022" `
             -A x64 `
             -DQt6_DIR="${env:Qt6_DIR}" `
             -DCMAKE_TOOLCHAIN_FILE="${{ steps.vcpkg.outputs.root }}\scripts\buildsystems\vcpkg.cmake"
-
-      - name: Build Debug
-        run: cmake --build $env:BUILD_DIR --config Debug -- /m:1
+          Write-Host ("[{0}] configure end" -f (Get-Date).ToString("o"))
 
       - name: Build Release
-        run: cmake --build $env:BUILD_DIR --config Release -- /m:1
+        run: |
+          Write-Host ("[{0}] release build start" -f (Get-Date).ToString("o"))
+          cmake --build $env:BUILD_DIR --config Release -- /m:1
+          Write-Host ("[{0}] release build end" -f (Get-Date).ToString("o"))
 
       - name: Validate runtime outputs
         run: |
-          $dbgDir = Join-Path $env:BUILD_DIR 'Sources\BUSMASTER\Application\Debug'
-          $relDir = Join-Path $env:BUILD_DIR 'Sources\BUSMASTER\Application\Release'
+          Write-Host ("[{0}] validate start" -f (Get-Date).ToString("o"))
 
+          $relDir = Join-Path $env:BUILD_DIR 'Sources\BUSMASTER\Application\Release'
           $required = @(
-            Join-Path $dbgDir 'NovoBusAnalyzer.exe'
             Join-Path $relDir 'NovoBusAnalyzer.exe'
-            Join-Path $dbgDir 'ConverterPlugins\DBC2DBFConverter.dll'
-            Join-Path $dbgDir 'ConverterPlugins\DBC2DBFConverterLibrary.dll'
             Join-Path $relDir 'ConverterPlugins\DBC2DBFConverter.dll'
             Join-Path $relDir 'ConverterPlugins\DBC2DBFConverterLibrary.dll'
-            Join-Path $dbgDir 'BUSMASTER.chm'
             Join-Path $relDir 'BUSMASTER.chm'
             'Tests\Samples\CAN\dbc_smoke.dbc'
           )
@@ -99,6 +121,8 @@ jobs:
               throw "Missing expected file: $path"
             }
           }
+
+          Write-Host ("[{0}] validate end" -f (Get-Date).ToString("o"))
 
       - name: Verify DBC converter is x64
         run: |
@@ -117,24 +141,12 @@ jobs:
             }
           }
 
-          $dll = Join-Path $env:BUILD_DIR 'Sources\BUSMASTER\Application\Debug\ConverterPlugins\DBC2DBFConverter.dll'
+          $dll = Join-Path $env:BUILD_DIR 'Sources\BUSMASTER\Application\Release\ConverterPlugins\DBC2DBFConverter.dll'
           $machine = Get-PeMachine -Path $dll
           if ($machine -ne 0x8664) {
             throw "DBC2DBFConverter.dll is not x64. Machine=0x{0:X4}" -f $machine
           }
           Write-Host "DBC2DBFConverter.dll machine=0x{0:X4}" -f $machine
-
-      - name: Upload Debug artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: busmaster-windows-debug
-          path: |
-            build_ci\Sources\BUSMASTER\Application\Debug
-            build_ci\Sources\BUSMASTER\FormatConverter\DBC2DBFConverter\Debug
-            build_ci\Sources\BUSMASTER\FormatConverter\DBC2DBFConverterLibrary\Debug
-            build_ci\Sources\BUSMASTER\FormatConverter\FormatConverterApp\Debug
-            build_ci\Sources\BUSMASTER\cmake\*.log
-          if-no-files-found: warn
 
       - name: Upload Release artifacts
         uses: actions/upload-artifact@v4
@@ -142,8 +154,9 @@ jobs:
           name: busmaster-windows-release
           path: |
             build_ci\Sources\BUSMASTER\Application\Release
-            build_ci\Sources\BUSMASTER\FormatConverter\DBC2DBFConverter\Release
-            build_ci\Sources\BUSMASTER\FormatConverter\DBC2DBFConverterLibrary\Release
-            build_ci\Sources\BUSMASTER\FormatConverter\FormatConverterApp\Release
             build_ci\Sources\BUSMASTER\cmake\*.log
+            build_ci\vcpkg-manifest-install.log
           if-no-files-found: warn
+
+      - name: Mark workflow end
+        run: Write-Host ("[{0}] workflow end" -f (Get-Date).ToString("o"))
