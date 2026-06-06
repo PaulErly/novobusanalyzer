@@ -156,11 +156,17 @@ ERRORCODE BMNetwork::DeleteDBService(ETYPE_BUS eouProtocol, int nChannelIndex,
   std::string path;
   int index = 0;
   for (auto cluster : clusterList) {
+    if (cluster == nullptr) {
+      index++;
+      continue;
+    }
     cluster->GetDBFilePath(path);
     if (path == dbPath) {
       if (EC_SUCCESS == m_ouProtocolConfig[eouProtocol].ReleaseDbService(
                             nChannelIndex, index)) {
-        mDbManagerAcessor.mFreeCluster(cluster);
+        if (mDbManagerAcessor.mFreeCluster != nullptr) {
+          mDbManagerAcessor.mFreeCluster(cluster);
+        }
         IDbChangeListner::DBChangeInfo changeInfo;
         changeInfo.mBusType = eouProtocol;
         changeInfo.mChannel = nChannelIndex;

@@ -67,5 +67,6 @@ extern DWORD dwGetMonitorClientID(void);
 
 extern bool RegisterImportedCanDatabaseForTransmit(CMsgSignal* pMsgSignal,
                                                    const CString& dbPath);
+extern bool UnregisterImportedCanDatabaseForTransmit(const CString& dbPath);
 
 #endif // BUSMASTER_APPLICATION_INTERFACEGETTER_H_

@@ -750,6 +750,8 @@ namespace
     std::unique_ptr<ImportedCanCluster> sg_pImportedCanCluster;
 }
 
+bool UnregisterImportedCanDatabaseForTransmit(const CString& dbPath);
+
 
 CBaseFrameProcessor_CAN* GetICANLogger(void)
 {
@@ -981,6 +983,27 @@ bool RegisterImportedCanDatabaseForTransmit(CMsgSignal* pMsgSignal,
         return false;
     }
 
+    std::string previousDbPath;
+    if (sg_pImportedCanCluster != nullptr)
+    {
+        sg_pImportedCanCluster->GetDBFilePath(previousDbPath);
+        if (!previousDbPath.empty())
+        {
+            TRACE1("Imported CAN database transmit registration replacing existing association: %s\n",
+                   previousDbPath.c_str());
+            if (!UnregisterImportedCanDatabaseForTransmit(previousDbPath.c_str()))
+            {
+                TRACE1("Imported CAN database transmit registration could not clear previous association: %s\n",
+                       previousDbPath.c_str());
+                return false;
+            }
+        }
+        else
+        {
+            sg_pImportedCanCluster.reset();
+        }
+    }
+
     auto pCluster = std::make_unique<ImportedCanCluster>(dbPath.GetString());
     if (!pCluster->BuildFromMsgSignal(pMsgSignal))
     {
@@ -1002,5 +1025,32 @@ bool RegisterImportedCanDatabaseForTransmit(CMsgSignal* pMsgSignal,
 
     sg_pImportedCanCluster = std::move(pCluster);
     TRACE0("Imported CAN database transmit registration completed successfully.\n");
+    return true;
+}
+
+bool UnregisterImportedCanDatabaseForTransmit(const CString& dbPath)
+{
+    CMainFrame* pMainFrame = GetIMainFrame();
+    IBMNetWorkService* pNetwork = nullptr;
+    if (pMainFrame != nullptr)
+    {
+        pMainFrame->getDbSetService(&pNetwork);
+    }
+    if (pMainFrame == nullptr || pNetwork == nullptr)
+    {
+        TRACE0("Imported CAN database transmit unregister skipped: network unavailable.\n");
+        sg_pImportedCanCluster.reset();
+        return true;
+    }
+
+    const std::string dbPathA = CT2A(dbPath);
+    if (EC_SUCCESS != pNetwork->DeleteDBService(CAN, 0, dbPathA))
+    {
+        TRACE1("Imported CAN database transmit unregister failed for path: %s\n", dbPath.GetString());
+        return false;
+    }
+
+    sg_pImportedCanCluster.reset();
+    TRACE1("Imported CAN database transmit unregister completed for path: %s\n", dbPath.GetString());
     return true;
 }

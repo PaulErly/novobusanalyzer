@@ -65,10 +65,22 @@ protected:
     // Generated message map functions
     //{{AFX_MSG(CMsgSignalDBWnd)
     afx_msg void OnClose();
+    afx_msg void OnSize(UINT nType, int cx, int cy);
+    afx_msg LRESULT OnDeferredLayout(WPARAM, LPARAM);
+    afx_msg void OnAcceptAssociation();
+    afx_msg void OnCancelAssociation();
     //}}AFX_MSG
     DECLARE_MESSAGE_MAP()
 private:
+    void vCreateFooterButtons();
+    void vLayoutFooterButtons(int cx, int cy);
+    void vUpdateEditorLayout();
+    void vDiscardImportedAssociation();
     void vCalculateSplitterPosition(CSize& cSize);
     BOOL m_bSplitWndCreated;
+    bool m_bKeepAssociationOnClose = false;
+    bool m_bLayoutReady = false;
     CSplitterWnd m_omSplitterWnd;
+    CButton m_omBtnAccept;
+    CButton m_omBtnCancel;
 };
