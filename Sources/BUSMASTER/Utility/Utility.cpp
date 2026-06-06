@@ -464,12 +464,9 @@ BOOL bConvertStringToInt64( CString omStrHexNo,
             // If the value is greater then base then
             // the string is invalid. say with base 8, 9 is invalid
             if (nCharVal - nBase >= 0) {
-                // Show Error
-                ASSERT (FALSE );
-                // Stop the loop by setting the max value
-                nCount = nStrLength;
-                // Indicate Failure
+                TRACE("bConvertStringToInt64 - invalid digit '%c' for base %d in '%s'\n", cChar, nBase, omStrHexNo.GetString());
                 bSuccess = FALSE;
+                break;
             } else {
                 // Add current digit with the value
                 n64RetVal = n64RetVal * nBase + nCharVal;
@@ -478,13 +475,9 @@ BOOL bConvertStringToInt64( CString omStrHexNo,
             // If the base is not hex then show error
             // and stop processing
             if (nBase != defBASE_HEX) {
-                // Show Error
-                ASSERT( FALSE );
-                // Stop the loop by setting the max value
-                nCount = nStrLength;
-                // Indicate Failure
+                TRACE("bConvertStringToInt64 - invalid hex digit '%c' for base %d in '%s'\n", cChar, nBase, omStrHexNo.GetString());
                 bSuccess = FALSE;
-
+                break;
             } else {
                 // Get the int value and add 10 with that
                 // Say 'A' - 'A' + 10 = 10
@@ -496,11 +489,9 @@ BOOL bConvertStringToInt64( CString omStrHexNo,
         } else if (cChar == '-') {
             // In Hex mode negative values are not correct
             if (nBase != defBASE_DEC || nCount != 0) {
-                ASSERT( FALSE );
-                // Stop the loop by setting the max value
-                nCount = nStrLength;
-                // Indicate Failure
+                TRACE("bConvertStringToInt64 - invalid negative sign position in '%s'\n", omStrHexNo.GetString());
                 bSuccess = FALSE;
+                break;
 
             }
             else {
@@ -509,12 +500,9 @@ BOOL bConvertStringToInt64( CString omStrHexNo,
         } else
         {
             // Invalid input char
-            ASSERT( FALSE );
-            // Stop the loop by setting the max value
-            nCount = nStrLength;
-            // Indicate Failure
+            TRACE("bConvertStringToInt64 - invalid character '%c' in '%s'\n", cChar, omStrHexNo.GetString());
             bSuccess = FALSE;
-
+            break;
         }
     }
     // If negative flag is set then take the negative value

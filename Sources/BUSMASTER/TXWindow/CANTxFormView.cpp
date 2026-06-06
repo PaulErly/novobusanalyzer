@@ -22,6 +22,7 @@
 #include "CANTransmitter.h"
 #include "HashDefines.h"
 #include "CANTxFormView.h"
+#include <afxframewndex.h>
 #include <cctype>
 #include "CANDefines.h"
 #include "BaseDIL_CAN.h"
@@ -356,22 +357,22 @@ for (auto itrMsgId : ouMsgIDNamesMap)
 int CCANTxFormView::nGetMessageIDNames(int nChannelIndex, std::map<int, std::string>& ouMsgIDNamesMap)
 {
     int hResult = S_FALSE;
-    if (nullptr == m_pouIBMNetwork)
+    if (nullptr != m_pouIBMNetwork)
     {
-        return hResult;
+        ICluster* ouDBService = nullptr;
+        std::list<IFrame*> lstFrames;
+        m_pouIBMNetwork->GetFrameList(CAN, nChannelIndex, lstFrames);
+        std::string strName = "";
+        unsigned int unId = 0;
+        hResult = S_OK;
+        for (const auto& itr : lstFrames)
+        {
+            itr->GetName(strName);
+            itr->GetFrameId(unId);
+            ouMsgIDNamesMap.insert(std::pair<int, std::string>(unId, strName));
+        }
     }
-    ICluster* ouDBService = nullptr;
-    std::list<IFrame*> lstFrames;
-    m_pouIBMNetwork->GetFrameList(CAN, nChannelIndex, lstFrames);
-    std::string strName = "";
-    unsigned int unId = 0;
-    hResult = S_OK;
-for (const auto& itr : lstFrames)
-    {
-        itr->GetName(strName);
-        itr->GetFrameId(unId);
-        ouMsgIDNamesMap.insert(std::pair<int, std::string>(unId, strName));
-    }
+
     return hResult;
 }
 

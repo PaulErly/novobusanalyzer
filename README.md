@@ -58,6 +58,9 @@ database structures that the legacy loader populated. J1939 database import
 and the LDF Editor still depend on `DBManager.dll` and are disabled with a
 clear message. Install an x64-compatible `DBManager.dll` beside the
 executable to re-enable those legacy workflows.
+The Qt-based LDF Editor and LDF Viewer helpers are excluded from the default
+x64 build so the main application can still be built and tested even if Qt
+autogen for those tools is unavailable.
 
 Supported x64 CAN database flow:
 - `.dbc` files are accepted.

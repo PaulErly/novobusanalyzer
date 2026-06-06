@@ -1022,10 +1022,17 @@ AUTHOR:             RBIN/EMC2 - Amarnath Shastry
 *******************************************************************************/
 void CMainFrame::OnOpenDatabase()
 {
+#if defined(_WIN64)
     if (m_ouBusmasterNetwork == nullptr || !m_ouBusmasterNetwork->isDbManagerAvailable()) {
-        AfxMessageBox(_("Database import is unavailable in this x64 build because DBManager.dll is x86-only."), MB_ICONINFORMATION | MB_OK);
+        AfxMessageBox(_("CAN DBF Open is unavailable in this x64 build because DBManager.dll is x86-only. Use CAN -> Database -> Associate to import DBC files."), MB_ICONINFORMATION | MB_OK);
         return;
     }
+#else
+    if (m_ouBusmasterNetwork == nullptr || !m_ouBusmasterNetwork->isDbManagerAvailable()) {
+        AfxMessageBox(_("Database import is unavailable because DBManager.dll is missing."), MB_ICONINFORMATION | MB_OK);
+        return;
+    }
+#endif
     INT nReturn = IDYES;
 
     // Check if any database is already open
@@ -1254,10 +1261,6 @@ AUTHOR:         RBIN/EMC2 - Amarnath Shastry
 *******************************************************************************/
 void CMainFrame::OnImportDatabase()
 {
-    if (m_ouBusmasterNetwork == nullptr || !m_ouBusmasterNetwork->isDbManagerAvailable()) {
-        AfxMessageBox(_("Database import is unavailable in this x64 build because DBManager.dll is x86-only."), MB_ICONINFORMATION | MB_OK);
-        return;
-    }
     CStringArray strFilePathArray;
     // Display a open file dialog
     CFileDialog fileDlg( TRUE,      // Open File dialog
@@ -1283,6 +1286,12 @@ void CMainFrame::OnImportDatabase()
 		
         for (uint32_t nCount = 0; nCount < nFileCount; nCount++) {
             CString strTempFileName = strFilePathArray.GetAt(nCount);
+#if defined(_WIN64)
+            if (strTempFileName.Right(4).CompareNoCase(_T(".dbc")) == 0) {
+                TRACE1("Skipping legacy DBManager load for DBC file on x64: %s\n", strTempFileName);
+                continue;
+            }
+#endif
             //FALSE because it is not called using COM
             DWORD dError=dLoadDataBaseFile(strTempFileName,FALSE);
             if (E_INVALIDARG==dError) {
@@ -1299,6 +1308,72 @@ void CMainFrame::OnImportDatabase()
             MessageBox(omStrMsg,"BUSMASTER",MB_OK|MB_ICONERROR);
         }
 
+#if defined(_WIN64)
+        CString strDbName = strFilePathArray.IsEmpty() ? CString() : strFilePathArray.GetAt(0);
+        if (strDbName.IsEmpty()) {
+            return;
+        }
+        TRACE1("CAN database associate selected file: %s\n", strDbName);
+        if (theApp.m_pouMsgSgInactive == nullptr) {
+            AfxMessageBox(_("CAN database import is unavailable because the internal CAN database object is missing."), MB_ICONSTOP | MB_OK);
+            return;
+        }
+
+        TRACE0("Invoking CAN DBC/DBF import through CMsgSignal::bFillDataStructureFromDatabaseFile.\n");
+        if (!theApp.m_pouMsgSgInactive->bFillDataStructureFromDatabaseFile(strDbName, PROTOCOL_CAN)) {
+            AfxMessageBox(_("CAN DBC import failed. Please verify the selected .dbc file and that DBC2DBFConverter.dll is deployed beside NovoBusAnalyzer.exe."), MB_ICONSTOP | MB_OK);
+            return;
+        }
+
+        sg_asDbParams[CAN].m_pouMsgSignalActiveDB = theApp.m_pouMsgSgInactive;
+        sg_asDbParams[CAN].m_pouMsgSignalImportedDBs = theApp.m_pouMsgSignal;
+        if (theApp.m_pouMsgSignal != nullptr) {
+            theApp.m_pouMsgSignal->bAddDbNameEntry(strDbName);
+        }
+        if (!RegisterImportedCanDatabaseForTransmit(theApp.m_pouMsgSgInactive, strDbName)) {
+            AfxMessageBox(_("CAN database was imported, but transmit support could not be registered for the imported CAN frames."), MB_OK | MB_ICONSTOP);
+            return;
+        }
+        if (theApp.pouGetFlagsPtr() != nullptr) {
+            theApp.pouGetFlagsPtr()->vSetFlagStatus(DBOPEN, TRUE);
+            theApp.pouGetFlagsPtr()->vSetFlagStatus(SELECTDATABASEFILE, TRUE);
+        }
+
+        if (m_podMsgSgWnd != nullptr) {
+            delete m_podMsgSgWnd;
+            m_podMsgSgWnd = nullptr;
+        }
+
+        m_podMsgSgWnd = new CMsgSignalDBWnd(sg_asDbParams[CAN]);
+        if (m_podMsgSgWnd == nullptr) {
+            AfxMessageBox(_(MSG_MEMORY_CONSTRAINT), MB_OK | MB_ICONINFORMATION);
+            return;
+        }
+
+        sg_asDbParams[CAN].m_omDBPath = strDbName;
+        m_podMsgSgWnd->vSetDBName(strDbName);
+        if (!m_podMsgSgWnd->Create(nullptr,
+                                   _("Database Editor"),
+                                   WS_CHILD | WS_VISIBLE | WS_OVERLAPPED | WS_CAPTION | WS_THICKFRAME,
+                                   rectDefault,
+                                   this)) {
+            MessageBox(_("Create BUSMASTER Database Window Failed!"), nullptr, MB_OK | MB_ICONERROR);
+            return;
+        }
+        m_podMsgSgWnd->ShowWindow(SW_SHOWNORMAL);
+        m_podMsgSgWnd->UpdateWindow();
+
+        CFlags* pFlags = theApp.pouGetFlagsPtr();
+        if (pFlags != nullptr) {
+            pFlags->vSetFlagStatus(DBOPEN, TRUE);
+        }
+
+        HWND hWnd = m_podMsgWndThread ? m_podMsgWndThread->hGetHandleMsgWnd(CAN) : nullptr;
+        if (hWnd) {
+            ::SendMessage(hWnd, WM_DATABASE_CHANGE, (WPARAM)TRUE, 0);
+        }
+        vUpdateMainEntryListInWaveDataHandler();
+#else
         HWND hWnd;
         hWnd = m_podMsgWndThread->hGetHandleMsgWnd(CAN);
 
@@ -1308,6 +1383,7 @@ void CMainFrame::OnImportDatabase()
 
         //Added by Arun to update Data Handler Main entry list.
         vUpdateMainEntryListInWaveDataHandler();
+#endif
     }
 }
 
@@ -1402,12 +1478,10 @@ DESCRIPTION:    Loads a database file selected by the user
 PARAMETERS:     file name ,bFrmCom
 RETURN VALUE:   bool
 *******************************************************************************/
-DWORD CMainFrame::dLoadDataBaseFile(CString omStrActiveDataBase, bool /* bFrmCom */)
+DWORD CMainFrame::dLoadDataBaseFile(CString omStrActiveDataBase, bool bFrmCom)
 {
     DWORD dReturn= (DWORD)E_FAIL;
-    //Check for same DB path......
-    //TODO::Remove
-    m_ouBusmasterNetwork->SetChannelCount( CAN, 1 );
+
     if (TRUE == PathIsRelative( omStrActiveDataBase )) {
         std::string omStrBasePath;
         CString omConfigFileName;
@@ -1417,6 +1491,10 @@ DWORD CMainFrame::dLoadDataBaseFile(CString omStrActiveDataBase, bool /* bFrmCom
         PathCombine(chAbsPath, omStrBasePath.c_str(), omStrActiveDataBase.GetBuffer( MAX_PATH ));
         omStrActiveDataBase = chAbsPath;
     }
+
+    //Check for same DB path......
+    //TODO::Remove
+    m_ouBusmasterNetwork->SetChannelCount( CAN, 1 );
 
     int channel = 0;
     ERRORCODE ecError = m_ouBusmasterNetwork->LoadDb( CAN, channel, omStrActiveDataBase.GetBuffer( 0 ) );
@@ -3256,9 +3334,13 @@ void CMainFrame::OnUpdateConfigureDatabaseNew(CCmdUI* pCmdUI)
 ******************************************************************************/
 void CMainFrame::OnUpdateConfigureDatabaseOpenActive(CCmdUI* pCmdUI)
 {
+#if defined(_WIN64)
+    pCmdUI->Enable(FALSE);
+#else
     const bool bDbManagerAvailable =
         (m_ouBusmasterNetwork != nullptr) && m_ouBusmasterNetwork->isDbManagerAvailable();
     pCmdUI->Enable(bDbManagerAvailable && !theApp.pouGetFlagsPtr()->nGetFlagStatus(DBOPEN));
+#endif
 }
 
 /******************************************************************************
@@ -3281,9 +3363,13 @@ void CMainFrame::OnUpdateConfigureDatabaseSaveas(CCmdUI* pCmdUI)
 
 void CMainFrame::OnUpdateLDFEditor(CCmdUI* pCmdUI)
 {
+#if defined(_WIN64)
+    pCmdUI->Enable(FALSE);
+#else
     const bool bDbManagerAvailable =
         (m_ouBusmasterNetwork != nullptr) && m_ouBusmasterNetwork->isDbManagerAvailable();
     pCmdUI->Enable(bDbManagerAvailable);
+#endif
 }
 
 /******************************************************************************
@@ -8440,11 +8526,46 @@ void CMainFrame::OnDissociateDatabase()
         cluster->GetDBFilePath( path );
         dbPathList.push_back( path );
     }
+#if defined(_WIN64)
+    if (dbPathList.empty() && theApp.m_pouMsgSignal != nullptr) {
+        CStringArray dbNames;
+        theApp.m_pouMsgSignal->vGetDataBaseNames(&dbNames);
+        for (INT i = 0; i < dbNames.GetSize(); ++i) {
+            dbPathList.push_back(std::string(CT2A(dbNames.GetAt(i))));
+        }
+    }
+#endif
     CDatabaseDissociateDlg odDBDialog( dbPathList );
     if (IDOK == odDBDialog.DoModal()) {
         dbPathList = odDBDialog.GetDissociatedFiles();
-        for (auto dbPath : dbPathList) {
-            m_ouBusmasterNetwork->DeleteDBService( CAN, 0, dbPath );
+#if defined(_WIN64)
+        if (clusterList.empty()) {
+            if (theApp.m_pouMsgSignal != nullptr) {
+                CStringArray remainingDbNames;
+                CStringArray currentDbNames;
+                theApp.m_pouMsgSignal->vGetDataBaseNames(&currentDbNames);
+                for (INT i = 0; i < currentDbNames.GetSize(); ++i) {
+                    CString currentName = currentDbNames.GetAt(i);
+                    bool keepName = true;
+                    for (const auto& dissociated : dbPathList) {
+                        if (currentName.CompareNoCase(dissociated.c_str()) == 0) {
+                            keepName = false;
+                            break;
+                        }
+                    }
+                    if (keepName) {
+                        remainingDbNames.Add(currentName);
+                    }
+                }
+                theApp.m_pouMsgSignal->vSetDataBaseNames(&remainingDbNames);
+            }
+        }
+        else
+#endif
+        {
+            for (auto dbPath : dbPathList) {
+                m_ouBusmasterNetwork->DeleteDBService( CAN, 0, dbPath );
+            }
         }
         ////////////////////////////////////////////////////////////
 
@@ -8724,19 +8845,32 @@ BOOL CALLBACK TerminateAppEnum( HWND hwnd, LPARAM lParam )
 ******************************************************************************/
 void CMainFrame::OnSaveImportDatabase()
 {
+#if defined(_WIN64)
+    TRACE0("OnSaveImportDatabase skipped in x64 build; legacy DBManager.dll path is unavailable.\n");
+    return;
+#else
     if (m_ouBusmasterNetwork == nullptr || !m_ouBusmasterNetwork->isDbManagerAvailable()) {
-        AfxMessageBox(_("Database import is unavailable in this x64 build because DBManager.dll is x86-only."), MB_ICONINFORMATION | MB_OK);
+        AfxMessageBox(_("Database import is unavailable because DBManager.dll is missing."), MB_ICONINFORMATION | MB_OK);
         return;
     }
+#endif
     OnConfigDatabaseSave();
     dLoadDataBaseFile(m_omStrDatabaseName, FALSE);
 }
 
 void CMainFrame::OnUpdateSaveImportDatabase(CCmdUI* pCmdUI)
 {
+#if defined(_WIN64)
+    if (pCmdUI->m_nID == IDM_FILE_IMPORT_DATABASE) {
+        pCmdUI->Enable(TRUE);
+    } else {
+        pCmdUI->Enable(FALSE);
+    }
+#else
     const bool bDbManagerAvailable =
         (m_ouBusmasterNetwork != nullptr) && m_ouBusmasterNetwork->isDbManagerAvailable();
     pCmdUI->Enable(bDbManagerAvailable && theApp.pouGetFlagsPtr()->nGetFlagStatus(DBOPEN));
+#endif
 }
 
 /**
@@ -8749,10 +8883,15 @@ void CMainFrame::OnUpdateSaveImportDatabase(CCmdUI* pCmdUI)
 */
 void CMainFrame::OnSaveImportJ1939Database()
 {
+#if defined(_WIN64)
+    AfxMessageBox(_("J1939 Save and Import is unavailable in this x64 build because DBManager.dll is x86-only."), MB_ICONINFORMATION | MB_OK);
+    return;
+#else
     if (m_ouBusmasterNetwork == nullptr || !m_ouBusmasterNetwork->isDbManagerAvailable()) {
-        AfxMessageBox(_("Database import is unavailable in this x64 build because DBManager.dll is x86-only."), MB_ICONINFORMATION | MB_OK);
+        AfxMessageBox(_("Database import is unavailable because DBManager.dll is missing."), MB_ICONINFORMATION | MB_OK);
         return;
     }
+#endif
     OnJ1939DBSave();
     dLoadJ1939DBFile(m_podMsgSgWndJ1939->m_sDbParams.m_omDBPath,FALSE);
 }
@@ -8767,9 +8906,13 @@ void CMainFrame::OnSaveImportJ1939Database()
 */
 void CMainFrame::OnUpdateSaveImportJ1939Database(CCmdUI* pCmdUI)
 {
+#if defined(_WIN64)
+    pCmdUI->Enable(FALSE);
+#else
     const bool bDbManagerAvailable =
         (m_ouBusmasterNetwork != nullptr) && m_ouBusmasterNetwork->isDbManagerAvailable();
     pCmdUI->Enable(bDbManagerAvailable && theApp.pouGetFlagsPtr()->nGetFlagStatus(DBOPEN_J1939));
+#endif
 }
 
 /******************************************************************************
@@ -14180,9 +14323,13 @@ void CMainFrame::OnUpdateJ1939DBNew(CCmdUI* pCmdUI)
 
 void CMainFrame::OnUpdateJ1939DBOpen(CCmdUI* pCmdUI)
 {
+#if defined(_WIN64)
+    pCmdUI->Enable(FALSE);
+#else
     const bool bDbManagerAvailable =
         (m_ouBusmasterNetwork != nullptr) && m_ouBusmasterNetwork->isDbManagerAvailable();
     pCmdUI->Enable(bDbManagerAvailable && !CMsgSignalDBWnd::sm_bValidJ1939Wnd);
+#endif
 }
 
 static void vGetNewJ1939DBName(CString& omString)
@@ -14307,10 +14454,15 @@ void CMainFrame::OnJ1939DBNew()
 
 void CMainFrame::OnJ1939DBOpen()
 {
+#if defined(_WIN64)
+    AfxMessageBox(_("J1939 database import is unavailable in this x64 build because DBManager.dll is x86-only."), MB_ICONINFORMATION | MB_OK);
+    return;
+#else
     if (m_ouBusmasterNetwork == nullptr || !m_ouBusmasterNetwork->isDbManagerAvailable()) {
-        AfxMessageBox(_("J1939 database import is unavailable in this x64 build because DBManager.dll is x86-only."), MB_ICONINFORMATION | MB_OK);
+        AfxMessageBox(_("J1939 database import is unavailable because DBManager.dll is missing."), MB_ICONINFORMATION | MB_OK);
         return;
     }
+#endif
     // Check if any database is already open
     if (CMsgSignalDBWnd::sm_bValidJ1939Wnd == TRUE) {
         // Some database is open
@@ -14511,10 +14663,15 @@ void CMainFrame::OnUpdateJ1939DBClose(CCmdUI* pCmdUI)
 
 void CMainFrame::OnJ1939DBAssociate()
 {
+#if defined(_WIN64)
+    AfxMessageBox(_("J1939 database import is unavailable in this x64 build because DBManager.dll is x86-only."), MB_ICONINFORMATION | MB_OK);
+    return;
+#else
     if (m_ouBusmasterNetwork == nullptr || !m_ouBusmasterNetwork->isDbManagerAvailable()) {
-        AfxMessageBox(_("J1939 database import is unavailable in this x64 build because DBManager.dll is x86-only."), MB_ICONINFORMATION | MB_OK);
+        AfxMessageBox(_("J1939 database import is unavailable because DBManager.dll is missing."), MB_ICONINFORMATION | MB_OK);
         return;
     }
+#endif
     CStringArray strFilePathArray;
     // Display a open file dialog
     CFileDialog fileDlg(TRUE,      // Open File dialog

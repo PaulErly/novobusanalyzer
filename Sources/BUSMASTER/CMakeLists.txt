@@ -90,6 +90,16 @@ set(CMAKE_MFC_FLAG 2) # shared MFC library
 add_definitions(-D_CRT_SECURE_NO_WARNINGS -wd4996) # warning C4996: '...': This function or variable may be unsafe. Consider using ... instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details.
 
 cmake_policy(SET CMP0020 NEW)
+
+option(BUILD_LDFVIEWER "Build the Qt-based LDF Viewer helper" OFF)
+if(NOT CMAKE_SIZEOF_VOID_P EQUAL 8)
+  set(BUILD_LDFVIEWER ON)
+endif()
+
+option(BUILD_LDFEDITOR "Build the Qt-based LDF Editor helper" OFF)
+if(NOT CMAKE_SIZEOF_VOID_P EQUAL 8)
+  set(BUILD_LDFEDITOR ON)
+endif()
 ################################################################################
 # Global include directories
 ################################################################################
@@ -153,8 +163,12 @@ add_subdirectory(UDS_Protocol)
 add_subdirectory(Utility)
 # add_subdirectory(Include)
 add_subdirectory(LIN_Kvaser)
-add_subdirectory(LDFEditor)
-add_subdirectory(LDFViewer)
+if(BUILD_LDFEDITOR)
+  add_subdirectory(LDFEditor)
+endif()
+if(BUILD_LDFVIEWER)
+  add_subdirectory(LDFViewer)
+endif()
 
 if(WIN32 AND CMAKE_SIZEOF_VOID_P EQUAL 8)
   include(RuntimeDeployment.cmake)

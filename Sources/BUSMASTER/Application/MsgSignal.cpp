@@ -30,33 +30,63 @@
 #include "MsgSignal.h"      // Class defintion file
 #include "MessageAttrib.h"   //Saving contents on dissocation of database
 #include "BUSMASTER.h"
+#include "FormatConverter/FormatConverterApp/BaseConverter.h"
 #include <algorithm>
 #include <map>
 #include <list>
 #include <sstream>
-
-class CBaseConverter
-{
-public:
-    virtual HRESULT GetInputFileFilters(string&, string&) = 0;
-    virtual HRESULT GetOutputFileFilters(string&, string&) = 0;
-    virtual HRESULT ConvertFile(string& chInputFile, string& chOutputFile) = 0;
-    virtual HRESULT GetConverterName(string& strConverterName) = 0;
-    virtual HRESULT GetErrorStatus(HRESULT hResult, string& omstrStatus) = 0;
-    virtual HRESULT GetLastConversionStatus(HRESULT& hResult, string& omstrStatus) = 0;
-    virtual HRESULT GetHelpText(CString& pchHelpText) = 0;
-    virtual BOOL bHaveOwnWindow() = 0;
-    virtual HRESULT GetPropertyPage(CPropertyPage*& pPage) = 0;
-    virtual HRESULT GettextBusmaster() = 0;
-    virtual ~CBaseConverter() {}
-};
-
+#include <fstream>
 typedef HRESULT (*GETBASECONVERTER)(CBaseConverter*& pouConverter);
 
 static CHAR s_acTraceStr[1024] = {""};
 
 namespace
 {
+CString GetDbcImportLogPath()
+{
+    TCHAR tempPath[MAX_PATH] = {0};
+    if (GetTempPath(MAX_PATH, tempPath) == 0)
+    {
+        return CString();
+    }
+
+    CString logPath(tempPath);
+    logPath += _T("NovoBusAnalyzer_dbc_import.log");
+    return logPath;
+}
+
+void AppendDbcImportLog(const CString& line)
+{
+    const CString logPath = GetDbcImportLogPath();
+    if (logPath.IsEmpty())
+    {
+        return;
+    }
+
+    CStdioFile file;
+    if (!file.Open(logPath, CFile::modeCreate | CFile::modeNoTruncate | CFile::modeReadWrite | CFile::shareDenyNone | CFile::typeText))
+    {
+        return;
+    }
+    file.SeekToEnd();
+    file.WriteString(line);
+    file.WriteString(_T("\r\n"));
+    file.Close();
+}
+
+void LogDbcImportStage(const CString& stage, const CString& detail = CString())
+{
+    CString line;
+    line.Format(_T("[%lu] %s%s%s"),
+                static_cast<unsigned long>(GetTickCount()),
+                stage.GetString(),
+                detail.IsEmpty() ? _T("") : _T(" - "),
+                detail.GetString());
+    OutputDebugString(line);
+    OutputDebugString(_T("\r\n"));
+    AppendDbcImportLog(line);
+}
+
 CString GetModuleDirectory()
 {
     TCHAR modulePath[MAX_PATH] = {0};
@@ -89,13 +119,34 @@ bool bConvertDbcToDbf(const CString& strDbcFile, CString& strDbfFile)
     CString strDllPath = strModuleDir;
     if (!strDllPath.IsEmpty())
     {
-        strDllPath += _T("\\DBC2DBFConverter.dll");
+        strDllPath += _T("\\ConverterPlugins\\DBC2DBFConverter.dll");
+    }
+
+    LogDbcImportStage(_T("CAN DBC import entered"), strDbcFile);
+    LogDbcImportStage(_T("DBC converter DLL probe"), strDllPath);
+    if (!strModuleDir.IsEmpty())
+    {
+        CString libraryPath = strModuleDir + _T("\\ConverterPlugins\\DBC2DBFConverterLibrary.dll");
+        LogDbcImportStage(_T("DBC converter dependency probe"), libraryPath);
+        if (!PathFileExists(libraryPath))
+        {
+            LogDbcImportStage(_T("DBC converter dependency missing"), libraryPath);
+        }
     }
 
     HMODULE hModule = nullptr;
     if (!strDllPath.IsEmpty())
     {
-        hModule = LoadLibrary(strDllPath);
+        hModule = LoadLibraryEx(strDllPath, nullptr, LOAD_WITH_ALTERED_SEARCH_PATH);
+    }
+    if (hModule == nullptr)
+    {
+        CString strSideBySideDll = GetModuleDirectory();
+        if (!strSideBySideDll.IsEmpty())
+        {
+            strSideBySideDll += _T("\\DBC2DBFConverter.dll");
+            hModule = LoadLibraryEx(strSideBySideDll, nullptr, LOAD_WITH_ALTERED_SEARCH_PATH);
+        }
     }
     if (hModule == nullptr)
     {
@@ -103,25 +154,37 @@ bool bConvertDbcToDbf(const CString& strDbcFile, CString& strDbfFile)
     }
     if (hModule == nullptr)
     {
-        TRACE1("DBC2DBFConverter.dll is unavailable for %s; DBC import is disabled.\n",
-               CT2A(strDbcFile));
+        CString detail;
+        detail.Format(_T("GetLastError=%lu"), GetLastError());
+        LogDbcImportStage(_T("DBC converter LoadLibrary failed"),
+                          detail);
         return false;
     }
+    LogDbcImportStage(_T("DBC converter LoadLibrary succeeded"));
 
     auto pGetBaseConverter =
         reinterpret_cast<GETBASECONVERTER>(GetProcAddress(hModule, "GetBaseConverter"));
     if (pGetBaseConverter == nullptr)
     {
         FreeLibrary(hModule);
-        TRACE0("GetBaseConverter export is unavailable in DBC2DBFConverter.dll.\n");
+        LogDbcImportStage(_T("GetBaseConverter lookup failed"));
         return false;
     }
+    LogDbcImportStage(_T("GetBaseConverter lookup succeeded"));
 
     CBaseConverter* pConverter = nullptr;
-    if (FAILED(pGetBaseConverter(pConverter)) || pConverter == nullptr)
+    HRESULT hrGetConverter = pGetBaseConverter(pConverter);
+    {
+        CString detail;
+        detail.Format(_T("result=0x%08X converter=%p"),
+                      static_cast<unsigned int>(hrGetConverter),
+                      pConverter);
+        LogDbcImportStage(_T("GetBaseConverter returned"), detail);
+    }
+    if (FAILED(hrGetConverter) || pConverter == nullptr)
     {
         FreeLibrary(hModule);
-        TRACE0("Failed to create DBC converter instance.\n");
+        LogDbcImportStage(_T("DBC converter instance creation failed"));
         return false;
     }
 
@@ -138,18 +201,53 @@ bool bConvertDbcToDbf(const CString& strDbcFile, CString& strDbfFile)
                          tempPath,
                          static_cast<unsigned long>(GetCurrentProcessId()),
                          static_cast<unsigned long>(GetTickCount()));
+    LogDbcImportStage(_T("DBC generated DBF path"), strOutputPath);
 
     std::string inputFile = CT2A(strDbcFile);
     std::string outputFile = CT2A(strOutputPath);
     HRESULT hResult = pConverter->ConvertFile(inputFile, outputFile);
+    {
+        CString detail;
+        detail.Format(_T("result=0x%08X"), static_cast<unsigned int>(hResult));
+        LogDbcImportStage(_T("DBC converter ConvertFile returned"), detail);
+    }
+    if (SUCCEEDED(hResult))
+    {
+        strDbfFile = strOutputPath;
+    }
 
     delete pConverter;
     FreeLibrary(hModule);
 
     if (FAILED(hResult))
     {
-        TRACE1("DBC to DBF conversion failed for %s\n", CT2A(strDbcFile));
+        LogDbcImportStage(_T("DBC to DBF conversion failed"), strDbcFile);
         return false;
+    }
+
+    const BOOL bDbfExists = PathFileExists(strDbfFile);
+    {
+        CString detail;
+        detail.Format(_T("exists=%s"), bDbfExists ? _T("true") : _T("false"));
+        LogDbcImportStage(_T("Generated DBF existence check"), detail);
+    }
+    if (!bDbfExists)
+    {
+        LogDbcImportStage(_T("Generated DBF missing after conversion"));
+        return false;
+    }
+
+    {
+        WIN32_FILE_ATTRIBUTE_DATA fad{};
+        if (GetFileAttributesEx(strDbfFile, GetFileExInfoStandard, &fad))
+        {
+            ULARGE_INTEGER size{};
+            size.HighPart = fad.nFileSizeHigh;
+            size.LowPart = fad.nFileSizeLow;
+            CString detail;
+            detail.Format(_T("size=%I64u bytes"), size.QuadPart);
+            LogDbcImportStage(_T("Generated DBF size"), detail);
+        }
     }
 
     strDbfFile = strOutputPath;
@@ -1214,6 +1312,7 @@ BOOL CMsgSignal::bFillDataStructureFromDatabaseFile( CString strFileName, eProto
 #if defined(_WIN64)
     if (bIsDbcFile(strFileName))
     {
+        LogDbcImportStage(_T("CMsgSignal import path"), _T("DBC input detected"));
         if (eProtocolName != PROTOCOL_CAN)
         {
             strcpy_s(s_acTraceStr, 1024, _("DBC import is only supported for CAN in this x64 build."));
@@ -1223,15 +1322,26 @@ BOOL CMsgSignal::bFillDataStructureFromDatabaseFile( CString strFileName, eProto
 
         if (!bConvertDbcToDbf(strFileName, strLoadFileName))
         {
-            strcpy_s(s_acTraceStr, 1024, _("DBC import failed."));
+            CString logPath = GetDbcImportLogPath();
+            CString message;
+            message.Format(_T("CAN DBC import failed. See log: %s"), logPath.GetString());
+            strcpy_s(s_acTraceStr, 1024, CT2A(message));
             vWriteTextToTrace();
             return FALSE;
         }
         bTempDbfCreated = true;
+        LogDbcImportStage(_T("DBC converted to temporary DBF"), strLoadFileName);
     }
 #endif
 
     // validate the file
+    {
+        CString detail;
+        detail.Format(_T("parsing path=%s legacy DBManager=%s"),
+                      strLoadFileName.GetString(),
+                      _T("not used for x64 CAN DBC"));
+        LogDbcImportStage(_T("Beginning DBF parse"), detail);
+    }
     bReturnValue = bValidateDatabaseFile(strLoadFileName);
     if ( bReturnValue )
     {
@@ -1491,10 +1601,25 @@ BOOL CMsgSignal::bFillDataStructureFromDatabaseFile( CString strFileName, eProto
                                             // If message length exceeds 8 stop opening the .dbf file
                                             if( m_psMessages[unMsgCount].m_unMessageLength > 8)
                                             {
+#if defined(_WIN64)
+                                                if (bTempDbfCreated)
+                                                {
+                                                    CString warn;
+                                                    warn.Format(_T("DBC import warning: message %s length %u exceeds classic CAN limit; clamping to 8 for x64 transmit."),
+                                                                m_psMessages[unMsgCount].m_omStrMessageName.GetString(),
+                                                                m_psMessages[unMsgCount].m_unMessageLength);
+                                                    strcpy_s(s_acTraceStr, 1024, CT2A(warn));
+                                                    vWriteTextToTrace();
+                                                    m_psMessages[unMsgCount].m_unMessageLength = 8;
+                                                }
+                                                else
+#endif
+                                                {
                                                 bIsMessageLengthExceeds = TRUE;
 
                                                 bReturnValue = FALSE;
                                                 break;
+                                                }
                                             }
                                         }
                                         sMsgDet = sMsgDet.Right(sMsgDet.GetLength() - nIndex - 1);
@@ -2130,16 +2255,19 @@ BOOL CMsgSignal::bFillDataStructureFromDatabaseFile( CString strFileName, eProto
         }
         strcpy_s(s_acTraceStr, 1024, strFileName);
         vWriteTextToTrace();
+        LogDbcImportStage(_T("DBC/DBF import finished with failure"), strLoadFileName);
     }
     else
     {
         vResetMsgMapContent();
         m_bIsDatabaseSaved = TRUE;
+        LogDbcImportStage(_T("DBC/DBF import finished successfully"), strLoadFileName);
     }
 
     if (bTempDbfCreated)
     {
         CFile::Remove(strLoadFileName);
+        LogDbcImportStage(_T("Temporary DBF removed"), strLoadFileName);
     }
     return (bReturnValue);
 }
