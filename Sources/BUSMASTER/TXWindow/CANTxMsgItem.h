@@ -23,7 +23,6 @@
 #define BUSMASTER_TXWINDOW_CANTXMSGITEM_H_
 
 #include "ITxMsgItem.h"
-
 #define def_MSG_TYPE_STD                                "Std"
 #define def_MSG_TYPE_EXT                                "Ext"
 #define def_MSG_DLC_MAX                                  8

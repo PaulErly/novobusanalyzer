@@ -386,12 +386,9 @@ BOOL CNumSpinCtrl::bConvertStringToInt64( CString omStrHexNo,
             // the string is invalid. say with base 8, 9 is invalid
             if( nCharVal - nBase >= 0 )
             {
-                // Show Error
-                ASSERT (FALSE );
-                // Stop the loop by setting the max value
-                nCount = nStrLength;
-                // Indicate Failure
+                TRACE("CNumSpinCtrl::bConvertStringToInt64 - invalid digit '%c' for base %d in '%s'\n", cChar, nBase, omStrHexNo.GetString());
                 bSuccess = FALSE;
+                break;
             }
             else
             {
@@ -406,13 +403,9 @@ BOOL CNumSpinCtrl::bConvertStringToInt64( CString omStrHexNo,
             // and stop processing
             if( nBase != defBASE_HEX )
             {
-                // Show Error
-                ASSERT( FALSE );
-                // Stop the loop by setting the max value
-                nCount = nStrLength;
-                // Indicate Failure
+                TRACE("CNumSpinCtrl::bConvertStringToInt64 - invalid hex digit '%c' for base %d in '%s'\n", cChar, nBase, omStrHexNo.GetString());
                 bSuccess = FALSE;
-
+                break;
             }
             // else Valid value
             else
@@ -430,12 +423,9 @@ BOOL CNumSpinCtrl::bConvertStringToInt64( CString omStrHexNo,
             // In Hex mode negative values are not correct
             if ( nBase != defBASE_DEC || nCount != 0 )
             {
-                ASSERT( FALSE );
-                // Stop the loop by setting the max value
-                nCount = nStrLength;
-                // Indicate Failure
+                TRACE("CNumSpinCtrl::bConvertStringToInt64 - invalid negative sign position in '%s'\n", omStrHexNo.GetString());
                 bSuccess = FALSE;
-
+                break;
             }
             else
             {
@@ -445,12 +435,9 @@ BOOL CNumSpinCtrl::bConvertStringToInt64( CString omStrHexNo,
         else
         {
             // Invalid input char
-            ASSERT( FALSE );
-            // Stop the loop by setting the max value
-            nCount = nStrLength;
-            // Indicate Failure
+            TRACE("CNumSpinCtrl::bConvertStringToInt64 - invalid character '%c' in '%s'\n", cChar, omStrHexNo.GetString());
             bSuccess = FALSE;
-
+            break;
         }
     }
     // If negative flag is set then take the negative value
@@ -754,6 +741,16 @@ void CNumSpinCtrl::vGetRangeAndDelta( __int64& n64Lower, __int64& n64Upper,
 *******************************************************************************/
 BOOL CNumSpinCtrl::OnDeltaPos(NMHDR* pNMHDR, LRESULT* pResult)
 {
+    if (GetSafeHwnd() == nullptr || !::IsWindow(m_hWnd))
+    {
+        TRACE("CNumSpinCtrl::OnDeltaPos - invalid spin control window\n");
+        if (pResult != nullptr)
+        {
+            *pResult = 0;
+        }
+        return FALSE;
+    }
+
     NM_UPDOWN* pUD = (NM_UPDOWN*)pNMHDR;
     // Get the new value
     // Current Val + Step Value * Steps

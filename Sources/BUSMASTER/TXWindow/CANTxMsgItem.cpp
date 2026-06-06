@@ -20,7 +20,8 @@
 */
 
 #include "CANTxMsgItem.h"
-
+#include <afxframewndex.h>
+#include <memory>
 CCANTxMsgItem::CCANTxMsgItem()
 {
     MsgDetails.pchData = new unsigned char[def_MSG_DLC_MAX];
@@ -86,6 +87,17 @@ int CCANTxMsgItem::GetMsgName(IBMNetWorkGetService* pouIBMNetwork, bool bIshex, 
     IFrame* pIFrame = nullptr;
     if (nullptr == pouIBMNetwork)
     {
+        hResult = S_OK;
+        char chValue[1024];
+        if (bIshex == false)
+        {
+            sprintf_s(chValue, 1024, "%d", MsgDetails.nMsgId);
+        }
+        else
+        {
+            sprintf_s(chValue, 1024, "0x%X", MsgDetails.nMsgId);
+        }
+        strMsgName = chValue;
         return hResult;
     }
     pouIBMNetwork->GetFrame(CAN, MsgDetails.nChannel - 1, MsgDetails.nMsgId, nullptr, &pIFrame);
@@ -338,42 +350,56 @@ int CCANTxMsgItem::GetSignalList(IBMNetWorkGetService* pouIBMNetwork, bool bIsHe
         ouFrameStruct->InterpretSignals(MsgDetails.pchData, MsgDetails.nDLC, lstSignalInterprete, bIsHex);
     }
 
-    auto itrSigItp = lstSignalInterprete.begin();
-    auto itrSignal = mapSignal.begin();
-    SIG_DETAILS ouSigDetails;
-    double dScale = 0;
-    for (; itrSigItp != lstSignalInterprete.end() && itrSignal != mapSignal.end(); ++itrSigItp, ++itrSignal)
+    std::map<std::string, InterpreteSignals> mapSignalInterpretation;
+    for (const auto& sigItp : lstSignalInterprete)
     {
-        ouSigDetails.SignalInterprete = *itrSigItp;
-        ouSigDetails.Signal = *itrSignal;
-        vGetPhysicalValueFactor(itrSignal->first, dScale);
-        if (dScale > 0)
+        mapSignalInterpretation.emplace(sigItp.m_omSigName, sigItp);
+    }
+
+    for (const auto& itrSignal : mapSignal)
+    {
+        SIG_DETAILS ouSigDetails;
+        std::string strSignalName;
+        if (itrSignal.first != nullptr)
         {
-            ouSigDetails.dPhyFactor = dScale;
+            itrSignal.first->GetName(strSignalName);
         }
-        else
+        auto itInterp = mapSignalInterpretation.find(strSignalName);
+        if (itInterp != mapSignalInterpretation.end())
         {
-            ouSigDetails.dPhyFactor = 1;
+            ouSigDetails.SignalInterprete = itInterp->second;
         }
+        ouSigDetails.Signal = itrSignal;
+
+        double dScale = 0;
+        vGetPhysicalValueFactor(itrSignal.first, dScale);
+        ouSigDetails.dPhyFactor = (dScale > 0) ? dScale : 1;
         lstSigDetails.push_back(ouSigDetails);
     }
+
     //Sort by start bit.
     lstSigDetails.sort(CCANTxMsgItem::sortByStartBit);
+    return hResult;
 }
 
 int CCANTxMsgItem::GetSignal(IBMNetWorkGetService* pouIBMNetwork, bool bIsHex, std::string strSigName, SIG_DETAILS& ouSignalDetails)
 {
     int hResult = S_FALSE;
+    ouSignalDetails = SIG_DETAILS{};
     std::list<SIG_DETAILS> lstSigDetails;
     GetSignalList(pouIBMNetwork, bIsHex, lstSigDetails);
     std::string strName = "";
-for (auto itr : lstSigDetails)
+    for (auto itr : lstSigDetails)
     {
-        itr.Signal.first->GetName(strName);
+        if (itr.Signal.first != nullptr)
+        {
+            itr.Signal.first->GetName(strName);
+        }
         if (strName == strSigName)
         {
             hResult = S_OK;
             ouSignalDetails = itr;
+            break;
         }
     }
     return hResult;

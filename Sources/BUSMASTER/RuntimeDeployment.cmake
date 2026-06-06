@@ -36,10 +36,16 @@ set(NOVO_RUNTIME_TARGETS
 set(NOVO_COMPANION_TARGETS
   BusEmulation
   FormatConverter
-  LDFEditor
-  LDFViewer
   TestSetupEditorGUI
 )
+
+if(BUILD_LDFEDITOR)
+  list(APPEND NOVO_COMPANION_TARGETS LDFEditor)
+endif()
+
+if(BUILD_LDFVIEWER)
+  list(APPEND NOVO_COMPANION_TARGETS LDFViewer)
+endif()
 
 set(NOVO_CONVERTER_PLUGIN_TARGETS
   AscLogConverter
@@ -77,9 +83,13 @@ endforeach()
 string(JOIN "\n" _converter_plugin_file_content ${_converter_plugin_files})
 
 set(_qt_deploy_inputs
-  "$<TARGET_FILE:LDFEditor>"
-  "$<TARGET_FILE:LDFViewer>"
 )
+if(BUILD_LDFEDITOR)
+  list(APPEND _qt_deploy_inputs "$<TARGET_FILE:LDFEditor>")
+endif()
+if(BUILD_LDFVIEWER)
+  list(APPEND _qt_deploy_inputs "$<TARGET_FILE:LDFViewer>")
+endif()
 string(JOIN "\n" _qt_deploy_input_content ${_qt_deploy_inputs})
 
 file(GENERATE

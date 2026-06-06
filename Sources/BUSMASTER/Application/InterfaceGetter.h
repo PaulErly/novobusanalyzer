@@ -40,6 +40,7 @@ class CBaseBusStatisticCAN;
 class CBaseBusStatisticLIN;
 class CBaseNodeSim;
 class CMsgSignal;
+class IBMNetWorkGetService;
 
 // External function prototypes
 extern CBaseFrameProcessor_CAN* GetICANLogger(void);
@@ -63,5 +64,8 @@ extern CBaseNodeSim* GetILINNodeSim(void);
 extern CBaseNodeSim* GetIJ1939NodeSim(void);
 extern CMsgSignal* GetIMsgDB(void);
 extern DWORD dwGetMonitorClientID(void);
+
+extern bool RegisterImportedCanDatabaseForTransmit(CMsgSignal* pMsgSignal,
+                                                   const CString& dbPath);
 
 #endif // BUSMASTER_APPLICATION_INTERFACEGETTER_H_

@@ -313,11 +313,29 @@ void ITxFormView::vInitMsgListCtrl(std::list<std::pair<std::string, int>>& lstMs
     INT nTotalStrLengthPixel = 0;
     INT nColumnSize = 0;
 
-    m_lstMsg.SubclassDlgItem(IDC_LSTC_TRANSMIT_MSG, this);
+    if (m_lstMsg.GetSafeHwnd() == nullptr)
+    {
+        CWnd* pMsgListWnd = GetDlgItem(IDC_LSTC_TRANSMIT_MSG);
+        if (pMsgListWnd == nullptr)
+        {
+            TRACE("ITxFormView::vInitMsgListCtrl - transmit message list control missing\n");
+            return;
+        }
+        if (m_lstMsg.SubclassWindow(pMsgListWnd->GetSafeHwnd()) == FALSE)
+        {
+            TRACE("ITxFormView::vInitMsgListCtrl - failed to subclass transmit message list control\n");
+            return;
+        }
+    }
+
     m_lstMsg.SetExtendedStyle(LVS_EX_FULLROWSELECT | LVS_EX_SUBITEMIMAGES | LVS_EX_GRIDLINES);
 
     CWnd* pWnd = m_lstMsg.GetWindow(GW_CHILD);
-    ASSERT(pWnd != nullptr);
+    if (pWnd == nullptr)
+    {
+        TRACE("ITxFormView::vInitMsgListCtrl - transmit message list header not ready\n");
+        return;
+    }
     CRect rctList;
     m_lstMsg.GetWindowRect(&rctList);
     int nColWidth = rctList.Width() - 2;
@@ -405,6 +423,12 @@ void ITxFormView::vInitDataByteListCtrl(bool bHexMode)
     INT nTotalStrLengthPixel = 0;
     INT nColumnSize = 0;
 
+    if (m_omLctrDataBytesList.GetSafeHwnd() == nullptr)
+    {
+        TRACE("ITxFormView::vInitDataByteListCtrl - data byte list control missing\n");
+        return;
+    }
+
     m_omLctrDataBytesList.GetWindowRect(&rListCtrlRect);
     nTotalColunmSize = rListCtrlRect.right - rListCtrlRect.left;
     nTotalStrLengthPixel = 0;
@@ -469,7 +493,11 @@ void ITxFormView::vInitSignalListCtrl()
     INT nTotalColunmSize = 0;
     INT nTotalStrLengthPixel = 0;
     INT nColumnSize = 0;
-
+    if (m_omLctrSigList.GetSafeHwnd() == nullptr)
+    {
+        TRACE("ITxFormView::vInitSignalListCtrl - signal list control missing\n");
+        return;
+    }
 
     //Calculate the total size of all column header
     m_omLctrSigList.GetWindowRect(&rListCtrlRect);
@@ -868,11 +896,18 @@ void ITxFormView::vOnSignalItemChanged(int nRow, int nColumn)
         return;
     }
     SIG_DETAILS ouSignalDetails;
-    pouMsgItem->GetSignal(m_pouIBMNetwork, m_bHexMode,std::string(omStrSigName), ouSignalDetails);
+    if (S_OK != pouMsgItem->GetSignal(m_pouIBMNetwork, m_bHexMode,std::string(omStrSigName), ouSignalDetails))
+    {
+        return;
+    }
 
     // If it is a valid signal
     if (ouSignalDetails.Signal.first != nullptr)
     {
+        if (pouMsgItem->MsgDetails.nDLC <= 0 || pouMsgItem->MsgDetails.nDLC > 8)
+        {
+            return;
+        }
         // Get the Signal Raw Value
         CString omStr = m_omLctrSigList.GetItemText(nRow, nColumn);
         unsigned __int64 un64Min, un64Max;
@@ -906,6 +941,10 @@ void ITxFormView::vOnSignalItemChanged(int nRow, int nColumn)
         {
             unsigned int unSiglength = 0;
             ouSignalDetails.Signal.first->GetLength(unSiglength);
+            if (unSiglength == 0 || unSiglength > 64)
+            {
+                return;
+            }
             __int64 nI64RawValue = static_cast<__int64>(FormatValue(eSigned,unSiglength,unI64RawValue));
             __int64 n64Min = static_cast<__int64>(un64Min);
             __int64 n64Max = static_cast<__int64>(un64Max);
@@ -926,6 +965,14 @@ unsigned __int64& ITxFormView::FormatValue(eSignalDataType eDataType, int  nSigl
 {
     if (eSigned == eDataType)
     {
+        if (nSiglength <= 0)
+        {
+            return un64RawValue;
+        }
+        if (nSiglength >= 64)
+        {
+            return un64RawValue;
+        }
         std::string strBinValue = std::bitset<64>(un64RawValue).to_string();
         int nStringLength = strBinValue.length();
         if (nSiglength > 0 && nSiglength <= nStringLength)
@@ -1101,6 +1148,10 @@ bool ITxFormView::SetTxData(eTXWNDDETAILS  eParam, LPVOID lpVoid)
 }
 void ITxFormView::vGetDataBytesFromSignal(unsigned long long u64SignVal, std::pair<ISignal*, SignalInstanse>& Signal, int nDLC, unsigned char* pucData)
 {
+    if (Signal.first == nullptr || pucData == nullptr || nDLC <= 0 || nDLC > 8)
+    {
+        return;
+    }
     unsigned char ucData[MAX_PATH] = {0};
     memcpy(ucData, pucData, nDLC);
     int byteOffsetBy8 = Signal.second.m_nStartBit / 64;
@@ -1108,6 +1159,10 @@ void ITxFormView::vGetDataBytesFromSignal(unsigned long long u64SignVal, std::pa
     int byteStart = Signal.second.m_nStartBit / 8 - (byteOffsetBy8 * 8) + 1;
     unsigned int nLength = 0;
     Signal.first->GetLength(nLength);
+    if (nLength == 0 || nLength > 64 || byteStart < 1 || byteStart > nDLC)
+    {
+        return;
+    }
     bool bIntel = false;
     eEndianess endian = eMotorola;
     GetEndianess(Signal, endian);
@@ -1120,6 +1175,10 @@ void ITxFormView::vGetDataBytesFromSignal(unsigned long long u64SignVal, std::pa
 }
 void ITxFormView::vSetSignalValue(int byte, int startBitIndexInByte, int length, bool bIntel, unsigned long long u64SignVal, unsigned char* aucData, int dataLenght)
 {
+    if (aucData == nullptr || dataLenght <= 0 || dataLenght > 8 || length <= 0 || length > 64)
+    {
+        return;
+    }
     /* Signal valuedata type happens to be of the same size of the entire CAN
     data byte array. Hence there is an opportunity to take advantage of this
     idiosyncratic characteristics. We will shifts the bit array in u64SignVal
@@ -1131,18 +1190,43 @@ void ITxFormView::vSetSignalValue(int byte, int startBitIndexInByte, int length,
     // bytes andvice versa.
     // First findout offset between the last significant bits of the signal
     // and theframe. Finding out the lsb will directly answer to thisquery.
-    UINT64 unMaxVal = pow((double)2, (double)length);
-    unMaxVal -= 1;
-    u64SignVal = u64SignVal&unMaxVal;
+    UINT64 unMaxVal = 0xFFFFFFFFFFFFFFFFULL;
+    if (length < 64)
+    {
+        unMaxVal = (static_cast<UINT64>(1) << length) - 1;
+    }
+    u64SignVal = u64SignVal & unMaxVal;
     if (bIntel == true)// If Intel format
     {
+        if (byte <= 0)
+        {
+            return;
+        }
         int Offset = (byte - 1) * 8 + startBitIndexInByte;
-        u64SignVal <<= Offset;// Exactly map the data bits on the databytes.
+        if (Offset < 64)
+        {
+            u64SignVal <<= Offset;// Exactly map the data bits on the databytes.
+        }
+        else
+        {
+            u64SignVal = 0;
+        }
     }
     else// If Motorola format
     {
+        if (byte <= 0)
+        {
+            return;
+        }
         int Offset = byte * 8 - startBitIndexInByte;
-        u64SignVal <<= (64 - Offset);
+        if (Offset < 64)
+        {
+            u64SignVal <<= (64 - Offset);
+        }
+        else
+        {
+            u64SignVal = 0;
+        }
         BYTE byTmp = 0x0;
         byTmp = pbData[7];
         pbData[7] = pbData[0];
@@ -1192,17 +1276,32 @@ int ITxFormView::HighlightSignalMatrix(int nDlc, const SignalInstanse& ouSignalI
 }
 UINT64 ITxFormView::un64GetBitMask(int byte, int startBitIndexInByte, int length, bool bIntel, unsigned char* /*aucData*/, unsigned long long /*u64SignVal*/)
 {
-    UINT64 Result = 0x1;
+    if (length <= 0 || length > 64 || byte <= 0)
+    {
+        return 0;
+    }
 
-    // First make the required number of bits (m_unSignalLength) up.
-    Result <<= length;
-    --Result; // These bits are now up.
+    UINT64 Result = 0xFFFFFFFFFFFFFFFFULL;
+    if (length < 64)
+    {
+        Result = 0x1;
+        // First make the required number of bits (m_unSignalLength) up.
+        Result <<= length;
+        --Result; // These bits are now up.
+    }
 
     // Then shift them to the appropriate place.
     short Shift = (true == bIntel) ?
                   ((short)byte - 1) * 8 + startBitIndexInByte
                   : 64 - ((short)byte * 8 - startBitIndexInByte);
-    Result <<= Shift;
+    if (Shift >= 0 && Shift < 64)
+    {
+        Result <<= Shift;
+    }
+    else
+    {
+        Result = 0;
+    }
 
     if (false == bIntel)
     {
