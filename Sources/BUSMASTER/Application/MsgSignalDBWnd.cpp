@@ -251,6 +251,10 @@ void CMsgSignalDBWnd::OnClose()
 {
     if (m_bKeepAssociationOnClose)
     {
+        if (CMainFrame* pFrame = static_cast<CMainFrame*>(AfxGetApp()->m_pMainWnd))
+        {
+            pFrame->vOnCanDatabaseEditorClosed();
+        }
         CMDIChildWnd::OnClose();
         return;
     }
@@ -472,6 +476,11 @@ void CMsgSignalDBWnd::vLayoutFooterButtons(int cx, int cy)
 
 void CMsgSignalDBWnd::OnAcceptAssociation()
 {
+    CMainFrame* pFrame = static_cast<CMainFrame*>(AfxGetApp()->m_pMainWnd);
+    if (pFrame != nullptr && !pFrame->bCommitCanDatabaseAssociation(m_sDbParams.m_omDBPath, true))
+    {
+        return;
+    }
     m_bKeepAssociationOnClose = true;
     PostMessage(WM_CLOSE, 0, 0);
 }
@@ -479,30 +488,19 @@ void CMsgSignalDBWnd::OnAcceptAssociation()
 void CMsgSignalDBWnd::OnCancelAssociation()
 {
     vDiscardImportedAssociation();
-    if (CMainFrame* pFrame = static_cast<CMainFrame*>(AfxGetApp()->m_pMainWnd))
-    {
-        pFrame->vCloseDatabaseWindow(false);
-    }
+    m_bKeepAssociationOnClose = true;
+    PostMessage(WM_CLOSE, 0, 0);
 }
 
 void CMsgSignalDBWnd::vDiscardImportedAssociation()
 {
+    if (!DiscardImportedCanDatabasePreview())
+    {
+        TRACE1("CAN DBC preview discard failed: %s\n", m_sDbParams.m_omDBPath.GetString());
+    }
+
     CMainFrame* pFrame = static_cast<CMainFrame*>(AfxGetApp()->m_pMainWnd);
-
-    if (m_sDbParams.m_pouMsgSignalImportedDBs != nullptr)
-    {
-        m_sDbParams.m_pouMsgSignalImportedDBs->bDeleteDbNameEntry(m_sDbParams.m_omDBPath);
-    }
-
-    const bool bUnregistered = UnregisterImportedCanDatabaseForTransmit(m_sDbParams.m_omDBPath);
-    if (!bUnregistered)
-    {
-        TRACE1("Cancel association could not unregister imported CAN database: %s\n",
-               m_sDbParams.m_omDBPath.GetString());
-    }
-
-    CFlags* pFlags = theApp.pouGetFlagsPtr();
-    if (pFlags != nullptr)
+    if (pFrame != nullptr)
     {
         CStringArray omRemainingDbNames;
         if (m_sDbParams.m_pouMsgSignalImportedDBs != nullptr)
@@ -510,12 +508,12 @@ void CMsgSignalDBWnd::vDiscardImportedAssociation()
             m_sDbParams.m_pouMsgSignalImportedDBs->vGetDataBaseNames(&omRemainingDbNames);
         }
         const BOOL bHasRemainingDb = (omRemainingDbNames.GetSize() > 0) ? TRUE : FALSE;
-        pFlags->vSetFlagStatus(DBOPEN, bHasRemainingDb);
-        pFlags->vSetFlagStatus(SELECTDATABASEFILE, bHasRemainingDb);
-    }
-
-    if (pFrame != nullptr)
-    {
-        pFrame->SendMessage(WM_DATABASE_CHANGE, (WPARAM)FALSE, 0);
+        CFlags* pFlags = theApp.pouGetFlagsPtr();
+        if (pFlags != nullptr)
+        {
+            pFlags->vSetFlagStatus(DBOPEN, bHasRemainingDb);
+            pFlags->vSetFlagStatus(SELECTDATABASEFILE, bHasRemainingDb);
+        }
+        pFrame->SendMessage(WM_DATABASE_CHANGE, (WPARAM)bHasRemainingDb, 0);
     }
 }

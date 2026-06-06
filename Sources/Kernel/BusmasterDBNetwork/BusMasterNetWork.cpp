@@ -182,6 +182,17 @@ ERRORCODE BMNetwork::DeleteDBService(ETYPE_BUS eouProtocol, int nChannelIndex,
   return EC_FAILURE;
 }
 
+ERRORCODE BMNetwork::ReleaseDBService(ETYPE_BUS eouProtocol, int nChannelIndex,
+                                      int nDBIndex) {
+  int nChannelsConfigured = 0;
+  m_ouProtocolConfig[eouProtocol].GetChannelCount(nChannelsConfigured);
+  if (nChannelIndex < nChannelsConfigured) {
+    return m_ouProtocolConfig[eouProtocol].ReleaseDbService(nChannelIndex,
+                                                            nDBIndex);
+  }
+  return EC_FAILURE;
+}
+
 ERRORCODE BMNetwork::GetSimulatedEcuList(ETYPE_BUS eouProtocol,
                                          int nChannelIndex,
                                          std::list<IEcu*>& ouEcuList) {

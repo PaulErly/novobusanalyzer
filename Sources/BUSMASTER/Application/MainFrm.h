@@ -265,7 +265,9 @@ public:
                                       bool bCreateEditor,
                                       bool bShowUserMessages,
                                       bool bFromConfig);
-    void vCloseDatabaseWindow(bool bPromptSave);
+    bool bCommitCanDatabaseAssociation(CString omDbPath, bool bShowUserMessages);
+    void vOnCanDatabaseEditorClosed();
+    void vCloseDatabaseWindow(bool bPromptSave, bool bUpdateFlags = true);
     DWORD dLoadJ1939DBFile(CString omStrActiveDataBase, bool bFrmCom);
     // To load specified configuration File
     DWORD dLoadDataBaseFile(CString omStrActiveDataBase, bool bFrmCom);

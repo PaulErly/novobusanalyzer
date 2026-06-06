@@ -747,10 +747,27 @@ namespace
         std::vector<std::unique_ptr<ImportedCanFrame>> m_frames;
     };
 
-    std::unique_ptr<ImportedCanCluster> sg_pImportedCanCluster;
+    std::unique_ptr<ImportedCanCluster> sg_pImportedCanClusterCommitted;
+    std::unique_ptr<ImportedCanCluster> sg_pImportedCanClusterPending;
+    CStringArray sg_aCommittedCanDbNames;
+    CString sg_omCommittedCanDbPath;
 }
 
-bool UnregisterImportedCanDatabaseForTransmit(const CString& dbPath);
+static void vSetCommittedCanDatabaseNamesFromSignal(CMsgSignal* pMsgSignal)
+{
+    if (pMsgSignal != nullptr)
+    {
+        pMsgSignal->vGetDataBaseNames(&sg_aCommittedCanDbNames);
+    }
+}
+
+static void vRestoreCommittedCanDatabaseNames(CMsgSignal* pMsgSignal)
+{
+    if (pMsgSignal != nullptr)
+    {
+        pMsgSignal->vSetDataBaseNames(&sg_aCommittedCanDbNames);
+    }
+}
 
 
 CBaseFrameProcessor_CAN* GetICANLogger(void)
@@ -963,8 +980,23 @@ CBaseNodeSim* GetIJ1939NodeSim(void)
     return Result;
 }
 
-bool RegisterImportedCanDatabaseForTransmit(CMsgSignal* pMsgSignal,
-                                           const CString& dbPath)
+bool HasPendingImportedCanDatabasePreview()
+{
+    return sg_pImportedCanClusterPending != nullptr;
+}
+
+bool HasCommittedImportedCanDatabase()
+{
+    return sg_pImportedCanClusterCommitted != nullptr;
+}
+
+void GetCommittedImportedCanDatabasePath(CString& dbPath)
+{
+    dbPath = sg_omCommittedCanDbPath;
+}
+
+bool BeginImportedCanDatabasePreview(CMsgSignal* pMsgSignal,
+                                     const CString& dbPath)
 {
     CMainFrame* pMainFrame = GetIMainFrame();
     IBMNetWorkService* pNetwork = nullptr;
@@ -983,25 +1015,32 @@ bool RegisterImportedCanDatabaseForTransmit(CMsgSignal* pMsgSignal,
         return false;
     }
 
-    std::string previousDbPath;
-    if (sg_pImportedCanCluster != nullptr)
+    if (sg_pImportedCanClusterPending != nullptr)
     {
-        sg_pImportedCanCluster->GetDBFilePath(previousDbPath);
-        if (!previousDbPath.empty())
+        TRACE0("Imported CAN database preview replacing existing pending association.\n");
+        if (sg_pImportedCanClusterCommitted != nullptr)
         {
-            TRACE1("Imported CAN database transmit registration replacing existing association: %s\n",
-                   previousDbPath.c_str());
-            if (!UnregisterImportedCanDatabaseForTransmit(previousDbPath.c_str()))
-            {
-                TRACE1("Imported CAN database transmit registration could not clear previous association: %s\n",
-                       previousDbPath.c_str());
-                return false;
-            }
+            pNetwork->SetDBService(CAN, 0, 0, sg_pImportedCanClusterCommitted.get());
         }
         else
         {
-            sg_pImportedCanCluster.reset();
+            pNetwork->ReleaseDBService(CAN, 0, 0);
         }
+        sg_pImportedCanClusterPending.reset();
+    }
+
+    vSetCommittedCanDatabaseNamesFromSignal(pMsgSignal);
+    if (sg_pImportedCanClusterCommitted != nullptr)
+    {
+        std::string committedDbPath;
+        if (sg_pImportedCanClusterCommitted->GetDBFilePath(committedDbPath) == EC_SUCCESS)
+        {
+            sg_omCommittedCanDbPath = committedDbPath.c_str();
+        }
+    }
+    else
+    {
+        sg_omCommittedCanDbPath.Empty();
     }
 
     auto pCluster = std::make_unique<ImportedCanCluster>(dbPath.GetString());
@@ -1022,13 +1061,12 @@ bool RegisterImportedCanDatabaseForTransmit(CMsgSignal* pMsgSignal,
         TRACE0("Imported CAN database transmit registration failed: SetDBService returned failure.\n");
         return false;
     }
-
-    sg_pImportedCanCluster = std::move(pCluster);
-    TRACE0("Imported CAN database transmit registration completed successfully.\n");
+    sg_pImportedCanClusterPending = std::move(pCluster);
+    TRACE0("Imported CAN database preview registration completed successfully.\n");
     return true;
 }
 
-bool UnregisterImportedCanDatabaseForTransmit(const CString& dbPath)
+bool CommitImportedCanDatabasePreview()
 {
     CMainFrame* pMainFrame = GetIMainFrame();
     IBMNetWorkService* pNetwork = nullptr;
@@ -1038,19 +1076,87 @@ bool UnregisterImportedCanDatabaseForTransmit(const CString& dbPath)
     }
     if (pMainFrame == nullptr || pNetwork == nullptr)
     {
-        TRACE0("Imported CAN database transmit unregister skipped: network unavailable.\n");
-        sg_pImportedCanCluster.reset();
+        TRACE0("Imported CAN database preview commit skipped: network unavailable.\n");
         return true;
     }
 
-    const std::string dbPathA = CT2A(dbPath);
-    if (EC_SUCCESS != pNetwork->DeleteDBService(CAN, 0, dbPathA))
+    if (sg_pImportedCanClusterPending == nullptr)
     {
-        TRACE1("Imported CAN database transmit unregister failed for path: %s\n", dbPath.GetString());
+        TRACE0("Imported CAN database preview commit failed: no pending association.\n");
         return false;
     }
 
-    sg_pImportedCanCluster.reset();
-    TRACE1("Imported CAN database transmit unregister completed for path: %s\n", dbPath.GetString());
+    if (sg_pImportedCanClusterCommitted != nullptr)
+    {
+        TRACE1("Imported CAN database preview commit replacing committed association: %s\n",
+               sg_omCommittedCanDbPath.GetString());
+    }
+
+    sg_pImportedCanClusterCommitted = std::move(sg_pImportedCanClusterPending);
+    {
+        std::string committedDbPath;
+        if (sg_pImportedCanClusterCommitted->GetDBFilePath(committedDbPath) == EC_SUCCESS)
+        {
+            sg_omCommittedCanDbPath = committedDbPath.c_str();
+        }
+    }
+    vSetCommittedCanDatabaseNamesFromSignal(theApp.m_pouMsgSignal);
+    TRACE1("Imported CAN database preview commit completed for path: %s\n",
+           sg_omCommittedCanDbPath.GetString());
+    return true;
+}
+
+bool DiscardImportedCanDatabasePreview()
+{
+    CMainFrame* pMainFrame = GetIMainFrame();
+    IBMNetWorkService* pNetwork = nullptr;
+    if (pMainFrame != nullptr)
+    {
+        pMainFrame->getDbSetService(&pNetwork);
+    }
+    if (pMainFrame == nullptr || pNetwork == nullptr)
+    {
+        TRACE0("Imported CAN database preview discard skipped: network unavailable.\n");
+        sg_pImportedCanClusterPending.reset();
+        return true;
+    }
+
+    if (sg_pImportedCanClusterPending == nullptr)
+    {
+        TRACE0("Imported CAN database preview discard skipped: no pending association.\n");
+        return true;
+    }
+
+    if (sg_omCommittedCanDbPath.IsEmpty() == FALSE && theApp.m_pouMsgSgInactive != nullptr)
+    {
+        if (!theApp.m_pouMsgSgInactive->bFillDataStructureFromDatabaseFile(sg_omCommittedCanDbPath, PROTOCOL_CAN))
+        {
+            TRACE1("Imported CAN database preview discard failed to restore committed data from: %s\n",
+                   sg_omCommittedCanDbPath.GetString());
+        }
+    }
+    else if (theApp.m_pouMsgSgInactive != nullptr)
+    {
+        theApp.m_pouMsgSgInactive->bDeAllocateMemoryInactive();
+    }
+
+    if (sg_pImportedCanClusterCommitted != nullptr)
+    {
+        pNetwork->SetDBService(CAN, 0, 0, sg_pImportedCanClusterCommitted.get());
+    }
+    else
+    {
+        pNetwork->ReleaseDBService(CAN, 0, 0);
+    }
+
+    vRestoreCommittedCanDatabaseNames(theApp.m_pouMsgSignal);
+    if (sg_pImportedCanClusterCommitted == nullptr)
+    {
+        sg_omCommittedCanDbPath.Empty();
+        sg_aCommittedCanDbNames.RemoveAll();
+    }
+    sg_pImportedCanClusterPending.reset();
+    TRACE1("Imported CAN database preview discard completed. Restored path: %s\n",
+           sg_omCommittedCanDbPath.GetString());
     return true;
 }

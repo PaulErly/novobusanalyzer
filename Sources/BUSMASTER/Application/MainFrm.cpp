@@ -1162,15 +1162,15 @@ DESCRIPTION:    Closes a database file
 *******************************************************************************/
 LRESULT CMainFrame::OnCloseDatabase(WPARAM /*wParam*/, LPARAM /*lParam*/)
 {
-    vCloseDatabaseWindow(true);
+    vCloseDatabaseWindow(true, true);
     return S_OK;
 }
 void CMainFrame::OnCloseDatabase()
 {
-    vCloseDatabaseWindow(true);
+    vCloseDatabaseWindow(true, true);
 }
 
-void CMainFrame::vCloseDatabaseWindow(bool bPromptSave)
+void CMainFrame::vCloseDatabaseWindow(bool bPromptSave, bool bUpdateFlags)
 {
     if (nullptr == m_podMsgSgWnd) {
         return;
@@ -1211,12 +1211,63 @@ void CMainFrame::vCloseDatabaseWindow(bool bPromptSave)
     // delete previously allocated memory if any
     pTempMsgSg->bDeAllocateMemoryInactive();
 
-    CFlags* pFlags = theApp.pouGetFlagsPtr();
-    if (pFlags != nullptr) {
-        pFlags->vSetFlagStatus(DBOPEN, FALSE);
+    if (bUpdateFlags) {
+        CFlags* pFlags = theApp.pouGetFlagsPtr();
+        if (pFlags != nullptr) {
+            pFlags->vSetFlagStatus(DBOPEN, FALSE);
+        }
     }
 
     m_podMsgSgWnd->MDIDestroy();
+    m_podMsgSgWnd = nullptr;
+}
+
+bool CMainFrame::bCommitCanDatabaseAssociation(CString omDbPath, bool bShowUserMessages)
+{
+#if !defined(_WIN64)
+    UNREFERENCED_PARAMETER(omDbPath);
+    UNREFERENCED_PARAMETER(bShowUserMessages);
+    return false;
+#else
+    if (theApp.m_pouMsgSgInactive == nullptr || theApp.m_pouMsgSignal == nullptr) {
+        if (bShowUserMessages) {
+            AfxMessageBox(_("CAN DBC import is unavailable because BUSMASTER is missing the internal CAN database objects."),
+                          MB_ICONSTOP | MB_OK);
+        }
+        TRACE0("CAN DBC commit failed: internal CAN database objects are missing.\n");
+        return false;
+    }
+
+    if (!CommitImportedCanDatabasePreview()) {
+        if (bShowUserMessages) {
+            AfxMessageBox(_("CAN DBC association could not be committed for transmit use."),
+                          MB_OK | MB_ICONSTOP);
+        }
+        TRACE1("CAN DBC commit failed: %s\n", omDbPath.GetString());
+        return false;
+    }
+
+    sg_asDbParams[CAN].m_pouMsgSignalActiveDB = theApp.m_pouMsgSgInactive;
+    sg_asDbParams[CAN].m_pouMsgSignalImportedDBs = theApp.m_pouMsgSignal;
+    sg_asDbParams[CAN].m_omDBPath = omDbPath;
+
+    if (theApp.pouGetFlagsPtr() != nullptr) {
+        theApp.pouGetFlagsPtr()->vSetFlagStatus(DBOPEN, TRUE);
+        theApp.pouGetFlagsPtr()->vSetFlagStatus(SELECTDATABASEFILE, TRUE);
+    }
+
+    HWND hWnd = m_podMsgWndThread ? m_podMsgWndThread->hGetHandleMsgWnd(CAN) : nullptr;
+    if (hWnd) {
+        ::SendMessage(hWnd, WM_DATABASE_CHANGE, (WPARAM)TRUE, 0);
+    }
+    vUpdateMainEntryListInWaveDataHandler();
+    TRACE1("CAN DBC commit succeeded: %s\n", omDbPath.GetString());
+    return true;
+#endif
+}
+
+void CMainFrame::vOnCanDatabaseEditorClosed()
+{
     m_podMsgSgWnd = nullptr;
 }
 
@@ -1373,6 +1424,16 @@ bool CMainFrame::bAssociateCanDatabaseFromDbc(CString omDbPath,
            bFromConfig ? "Config restore" : "Manual",
            omDbPath.GetString());
 
+    if (HasPendingImportedCanDatabasePreview()) {
+        if (bShowUserMessages) {
+            AfxMessageBox(_("x64 CAN DBC bridge currently supports one associated DBC at a time."),
+                          MB_OK | MB_ICONINFORMATION);
+        }
+        TRACE1("CAN DBC associate blocked because a pending association is already active: %s\n",
+               omDbPath.GetString());
+        return false;
+    }
+
     if (!theApp.m_pouMsgSgInactive->bFillDataStructureFromDatabaseFile(omDbPath, PROTOCOL_CAN)) {
         CString logPath;
         TCHAR tempPath[MAX_PATH] = {0};
@@ -1393,32 +1454,21 @@ bool CMainFrame::bAssociateCanDatabaseFromDbc(CString omDbPath,
         return false;
     }
 
-    sg_asDbParams[CAN].m_pouMsgSignalActiveDB = theApp.m_pouMsgSgInactive;
-    sg_asDbParams[CAN].m_pouMsgSignalImportedDBs = theApp.m_pouMsgSignal;
-    sg_asDbParams[CAN].m_omDBPath = omDbPath;
-    theApp.m_pouMsgSignal->bAddDbNameEntry(omDbPath);
-
-    if (!RegisterImportedCanDatabaseForTransmit(theApp.m_pouMsgSgInactive, omDbPath)) {
-        if (bShowUserMessages) {
-            AfxMessageBox(_("CAN database was imported, but transmit support could not be registered for the imported CAN frames."),
-                          MB_OK | MB_ICONSTOP);
-        }
-        TRACE1("CAN DBC associate imported but transmit registration failed: %s\n", omDbPath.GetString());
-        return false;
-    }
-
-    if (theApp.pouGetFlagsPtr() != nullptr) {
-        theApp.pouGetFlagsPtr()->vSetFlagStatus(DBOPEN, TRUE);
-        theApp.pouGetFlagsPtr()->vSetFlagStatus(SELECTDATABASEFILE, TRUE);
-    }
-
-    HWND hWnd = m_podMsgWndThread ? m_podMsgWndThread->hGetHandleMsgWnd(CAN) : nullptr;
-    if (hWnd) {
-        ::SendMessage(hWnd, WM_DATABASE_CHANGE, (WPARAM)TRUE, 0);
-    }
-    vUpdateMainEntryListInWaveDataHandler();
-
     if (bCreateEditor) {
+        sg_asDbParams[CAN].m_pouMsgSignalActiveDB = theApp.m_pouMsgSgInactive;
+        sg_asDbParams[CAN].m_pouMsgSignalImportedDBs = theApp.m_pouMsgSignal;
+        sg_asDbParams[CAN].m_omDBPath = omDbPath;
+        if (!BeginImportedCanDatabasePreview(theApp.m_pouMsgSgInactive, omDbPath)) {
+            if (bShowUserMessages) {
+                AfxMessageBox(_("CAN DBC import could not be prepared for preview."),
+                              MB_OK | MB_ICONSTOP);
+            }
+            TRACE1("CAN DBC preview preparation failed: %s\n", omDbPath.GetString());
+            return false;
+        }
+        CStringArray omDbNames;
+        omDbNames.Add(omDbPath);
+        theApp.m_pouMsgSignal->vSetDataBaseNames(&omDbNames);
         if (m_podMsgSgWnd != nullptr) {
             delete m_podMsgSgWnd;
             m_podMsgSgWnd = nullptr;
@@ -1445,8 +1495,29 @@ bool CMainFrame::bAssociateCanDatabaseFromDbc(CString omDbPath,
         }
         m_podMsgSgWnd->ShowWindow(SW_SHOWNORMAL);
         m_podMsgSgWnd->UpdateWindow();
+        return true;
     }
 
+    if (!BeginImportedCanDatabasePreview(theApp.m_pouMsgSgInactive, omDbPath)) {
+        if (bShowUserMessages) {
+            AfxMessageBox(_("CAN DBC import could not be prepared for association."),
+                          MB_OK | MB_ICONSTOP);
+        }
+        TRACE1("CAN DBC commit preparation failed: %s\n", omDbPath.GetString());
+        return false;
+    }
+
+    CStringArray omDbNames;
+    omDbNames.Add(omDbPath);
+    theApp.m_pouMsgSignal->vSetDataBaseNames(&omDbNames);
+    if (!CommitImportedCanDatabasePreview()) {
+        if (bShowUserMessages) {
+            AfxMessageBox(_("CAN database was imported, but transmit support could not be registered for the imported CAN frames."),
+                          MB_OK | MB_ICONSTOP);
+        }
+        TRACE1("CAN DBC associate imported but transmit registration failed: %s\n", omDbPath.GetString());
+        return false;
+    }
     return true;
 #endif
 }

@@ -65,8 +65,12 @@ extern CBaseNodeSim* GetIJ1939NodeSim(void);
 extern CMsgSignal* GetIMsgDB(void);
 extern DWORD dwGetMonitorClientID(void);
 
-extern bool RegisterImportedCanDatabaseForTransmit(CMsgSignal* pMsgSignal,
-                                                   const CString& dbPath);
-extern bool UnregisterImportedCanDatabaseForTransmit(const CString& dbPath);
+extern bool BeginImportedCanDatabasePreview(CMsgSignal* pMsgSignal,
+                                            const CString& dbPath);
+extern bool CommitImportedCanDatabasePreview();
+extern bool DiscardImportedCanDatabasePreview();
+extern bool HasPendingImportedCanDatabasePreview();
+extern bool HasCommittedImportedCanDatabase();
+extern void GetCommittedImportedCanDatabasePath(CString& dbPath);
 
 #endif // BUSMASTER_APPLICATION_INTERFACEGETTER_H_
