@@ -146,17 +146,69 @@ jobs:
           if ($machine -ne 0x8664) {
             throw "DBC2DBFConverter.dll is not x64. Machine=0x{0:X4}" -f $machine
           }
-          Write-Host "DBC2DBFConverter.dll machine=0x{0:X4}" -f $machine
+          Write-Host ("DBC2DBFConverter.dll machine=0x{0:X4}" -f $machine)
 
-      - name: Upload Release artifacts
+      - name: Install NSIS
+        run: |
+          $makensis = Get-Command makensis.exe -ErrorAction SilentlyContinue
+          if (-not $makensis) {
+            Write-Host "NSIS not found on PATH; installing via Chocolatey."
+            choco install nsis -y --no-progress
+            $nsisDir = Join-Path ${env:ProgramFiles(x86)} 'NSIS'
+            $env:Path = "$nsisDir;$env:Path"
+          }
+
+          $makensis = Get-Command makensis.exe -ErrorAction SilentlyContinue
+          if (-not $makensis) {
+            throw 'makensis.exe was not found after NSIS installation.'
+          }
+
+          Write-Host ("makensis={0}" -f $makensis.Source)
+
+      - name: Build installer
+        run: |
+          Write-Host ("[{0}] installer build start" -f (Get-Date).ToString("o"))
+          $installerDir = Join-Path $env:BUILD_DIR 'installer'
+          New-Item -ItemType Directory -Force -Path $installerDir | Out-Null
+
+          $releaseDir = Join-Path $env:BUILD_DIR 'Sources\BUSMASTER\Application\Release'
+          $sampleDbc = Join-Path $env:GITHUB_WORKSPACE 'Tests\Samples\CAN\dbc_smoke.dbc'
+          $installerOut = Join-Path $installerDir 'NovoBusAnalyzer_Setup.exe'
+          $nsisScript = Join-Path $env:GITHUB_WORKSPACE 'packaging\ci_novobusanalyzer_installer.nsi'
+
+          & $((Get-Command makensis.exe).Source) `
+            "/DRELEASE_DIR=$releaseDir" `
+            "/DSAMPLE_DBC=$sampleDbc" `
+            "/DOUTFILE=$installerOut" `
+            $nsisScript
+
+          if (-not (Test-Path $installerOut)) {
+            throw "Installer was not created: $installerOut"
+          }
+
+          Get-Item $installerOut | Select-Object FullName, Length, LastWriteTime | Format-List
+          Write-Host ("[{0}] installer build end" -f (Get-Date).ToString("o"))
+
+      - name: Upload Release runtime artifacts
         uses: actions/upload-artifact@v4
         with:
           name: busmaster-windows-release
           path: |
-            build_ci\Sources\BUSMASTER\Application\Release
+            build_ci\Sources\BUSMASTER\Application\Release\**
+            !build_ci\Sources\BUSMASTER\Application\Release\*.ilk
+            !build_ci\Sources\BUSMASTER\Application\Release\*.exp
+            !build_ci\Sources\BUSMASTER\Application\Release\*.obj
+            !build_ci\Sources\BUSMASTER\Application\Release\**\*.pdb
             build_ci\Sources\BUSMASTER\cmake\*.log
             build_ci\vcpkg-manifest-install.log
           if-no-files-found: warn
+
+      - name: Upload installer artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: busmaster-windows-installer
+          path: build_ci\installer\NovoBusAnalyzer_Setup.exe
+          if-no-files-found: error
 
       - name: Mark workflow end
         run: Write-Host ("[{0}] workflow end" -f (Get-Date).ToString("o"))
