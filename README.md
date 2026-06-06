@@ -68,6 +68,12 @@ Supported x64 CAN database flow:
   units, and enumerated values are preserved through the converter.
 - Unsupported database formats fail with a user-visible message instead of a
   silent DLL load error.
+- The x64 CAN DBC bridge currently supports one associated CAN DBC globally.
+  It does not yet support channel-based associations such as `CAN1/FileA.dbc`
+  and `CAN2/FileB.dbc`; that is a future PR.
+- File dialog multi-select is unrelated to this limit. The bridge is
+  intentionally single-association in x64 even when only one file is chosen at
+  a time.
 
 The deploy step also copies `BUSMASTER.chm` from `Sources/BUSMASTER/BIN/Release`
 into the runtime folder so the Help menu and the Test Automation Editor help

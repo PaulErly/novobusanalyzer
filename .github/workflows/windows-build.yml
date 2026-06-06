@@ -50,6 +50,17 @@ jobs:
           if ([string]::IsNullOrWhiteSpace($vcpkgRoot) -or -not (Test-Path (Join-Path $vcpkgRoot 'scripts\buildsystems\vcpkg.cmake'))) {
             throw 'vcpkg was not found on the runner.'
           }
+          $isShallow = $false
+          try {
+            $isShallow = ((git -C $vcpkgRoot rev-parse --is-shallow-repository) -eq 'true')
+          } catch {
+            $isShallow = $false
+          }
+          if ($isShallow) {
+            git -C $vcpkgRoot fetch --unshallow --tags origin
+          } else {
+            git -C $vcpkgRoot fetch --tags origin
+          }
           "root=$vcpkgRoot" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
 
       - name: Configure Debug

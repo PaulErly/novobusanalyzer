@@ -11366,6 +11366,7 @@ int CMainFrame::nLoadXMLConfiguration()
                 if( nullptr != pPathObject ) {
                     pNodeSet = pPathObject->nodesetval;
 
+                    bool bCanDbcConfigLoaded = false;
                     if(nullptr != pNodeSet) {
                         for(int i=0; i < pNodeSet->nodeNr; i++) {
                             if (  nullptr != pNodeSet->nodeTab[i]->xmlChildrenNode ) {
@@ -11374,8 +11375,14 @@ int CMainFrame::nLoadXMLConfiguration()
 #if defined(_WIN64)
                                     CString omDbPath = (const char*)ptext;
                                     if (omDbPath.Right(4).CompareNoCase(_T(".dbc")) == 0) {
-                                        if (!bAssociateCanDatabaseFromDbc(omDbPath, false, false, true)) {
+                                        if (bCanDbcConfigLoaded) {
+                                            TRACE1("Config restore ignored additional CAN DBC entry in x64: %s\n", omDbPath.GetString());
+                                        }
+                                        else if (!bAssociateCanDatabaseFromDbc(omDbPath, false, false, true)) {
                                             TRACE1("Config restore failed to import CAN DBC: %s\n", omDbPath.GetString());
+                                        }
+                                        else {
+                                            bCanDbcConfigLoaded = true;
                                         }
                                     }
                                     else
