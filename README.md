@@ -78,7 +78,7 @@ link can resolve locally.
 The GitHub Actions workflow at `.github/workflows/windows-build.yml` validates
 that the modern x64 BUSMASTER build configures and compiles on a clean Windows
 runner using the closest available Microsoft toolchain on GitHub-hosted
-machines.
+machines. It installs Qt 6.8.3 through `jurplel/install-qt-action`.
 
 It currently checks:
 - Debug x64 and Release x64 builds

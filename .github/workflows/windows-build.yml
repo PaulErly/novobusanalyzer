@@ -17,7 +17,7 @@ jobs:
 
     env:
       BUILD_DIR: build_ci
-      QT_VERSION: 6.11.1
+      QT_VERSION: 6.8.3
       QT_ARCH: win64_msvc2022_64
       VCPKG_BINARY_SOURCES: clear;x-gha,readwrite
 

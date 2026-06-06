@@ -1424,9 +1424,24 @@ bool CMainFrame::bAssociateCanDatabaseFromDbc(CString omDbPath,
            bFromConfig ? "Config restore" : "Manual",
            omDbPath.GetString());
 
+    CString omCommittedDbPath;
+    GetCommittedImportedCanDatabasePath(omCommittedDbPath);
+    if (!omCommittedDbPath.IsEmpty() && omCommittedDbPath.CompareNoCase(omDbPath) != 0) {
+        if (bShowUserMessages) {
+            AfxMessageBox(_("x64 CAN DBC bridge currently supports one associated CAN DBC globally. "
+                            "Sequential/channel-based CAN DBC associations are not supported yet. "
+                            "Please cancel or close the existing association before loading a different DBC."),
+                          MB_OK | MB_ICONINFORMATION);
+        }
+        TRACE2("CAN DBC associate blocked by committed association. current=%s requested=%s\n",
+               omCommittedDbPath.GetString(), omDbPath.GetString());
+        return false;
+    }
+
     if (HasPendingImportedCanDatabasePreview()) {
         if (bShowUserMessages) {
-            AfxMessageBox(_("x64 CAN DBC bridge currently supports one associated DBC at a time."),
+            AfxMessageBox(_("x64 CAN DBC bridge currently supports one associated CAN DBC globally. "
+                            "Sequential/channel-based CAN DBC associations are not supported yet."),
                           MB_OK | MB_ICONINFORMATION);
         }
         TRACE1("CAN DBC associate blocked because a pending association is already active: %s\n",
