@@ -168,10 +168,10 @@ jobs:
       - name: Build installer
         run: |
           Write-Host ("[{0}] installer build start" -f (Get-Date).ToString("o"))
-          $installerDir = Join-Path $env:BUILD_DIR 'installer'
+          $installerDir = Join-Path $env:GITHUB_WORKSPACE 'build_ci\installer'
           New-Item -ItemType Directory -Force -Path $installerDir | Out-Null
 
-          $releaseDir = Join-Path $env:BUILD_DIR 'Sources\BUSMASTER\Application\Release'
+          $releaseDir = Join-Path $env:GITHUB_WORKSPACE 'build_ci\Sources\BUSMASTER\Application\Release'
           $sampleDbc = Join-Path $env:GITHUB_WORKSPACE 'Tests\Samples\CAN\dbc_smoke.dbc'
           $installerOut = Join-Path $installerDir 'NovoBusAnalyzer_Setup.exe'
           $nsisScript = Join-Path $env:GITHUB_WORKSPACE 'packaging\ci_novobusanalyzer_installer.nsi'
