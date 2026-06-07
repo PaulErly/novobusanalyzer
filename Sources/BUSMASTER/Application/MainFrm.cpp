@@ -177,6 +177,16 @@ namespace
         }
         return true;
     }
+
+    void ResetPreviewImportedCanDatabaseObject()
+    {
+        if (theApp.m_pouMsgSgInactive != nullptr)
+        {
+            theApp.m_pouMsgSgInactive->bDeAllocateMemoryInactive();
+            CStringArray emptyDbNames;
+            theApp.m_pouMsgSgInactive->vSetDataBaseNames(&emptyDbNames);
+        }
+    }
 }
 
 // Flag for Msg Handler status
@@ -1240,7 +1250,7 @@ bool CMainFrame::bCommitCanDatabaseAssociation(CString omDbPath, bool bShowUserM
 
     if (!CommitImportedCanDatabasePreview()) {
         if (bShowUserMessages) {
-            AfxMessageBox(_("CAN DBC association could not be committed for transmit use."),
+            AfxMessageBox(_("CAN DBC association could not be committed for transmit use."), 
                           MB_OK | MB_ICONSTOP);
         }
         TRACE1("CAN DBC commit failed: %s\n", omDbPath.GetString());
@@ -1251,16 +1261,6 @@ bool CMainFrame::bCommitCanDatabaseAssociation(CString omDbPath, bool bShowUserM
     sg_asDbParams[CAN].m_pouMsgSignalImportedDBs = theApp.m_pouMsgSignal;
     sg_asDbParams[CAN].m_omDBPath = omDbPath;
 
-    if (theApp.pouGetFlagsPtr() != nullptr) {
-        theApp.pouGetFlagsPtr()->vSetFlagStatus(DBOPEN, TRUE);
-        theApp.pouGetFlagsPtr()->vSetFlagStatus(SELECTDATABASEFILE, TRUE);
-    }
-
-    HWND hWnd = m_podMsgWndThread ? m_podMsgWndThread->hGetHandleMsgWnd(CAN) : nullptr;
-    if (hWnd) {
-        ::SendMessage(hWnd, WM_DATABASE_CHANGE, (WPARAM)TRUE, 0);
-    }
-    vUpdateMainEntryListInWaveDataHandler();
     TRACE1("CAN DBC commit succeeded: %s\n", omDbPath.GetString());
     return true;
 #endif
@@ -1269,6 +1269,18 @@ bool CMainFrame::bCommitCanDatabaseAssociation(CString omDbPath, bool bShowUserM
 void CMainFrame::vOnCanDatabaseEditorClosed()
 {
     m_podMsgSgWnd = nullptr;
+}
+
+void CMainFrame::vNotifyCanDatabaseChange(bool bAdded)
+{
+    if (m_podMsgWndThread != nullptr)
+    {
+        HWND hWnd = m_podMsgWndThread->hGetHandleMsgWnd(CAN);
+        if (hWnd != nullptr)
+        {
+            ::SendMessage(hWnd, WM_DATABASE_CHANGE, (WPARAM)bAdded, 0);
+        }
+    }
 }
 
 /******************************************************************************
@@ -1342,7 +1354,8 @@ void CMainFrame::OnImportDatabase()
 #if defined(_WIN64)
             if (strTempFileName.Right(4).CompareNoCase(_T(".dbc")) == 0) {
                 TRACE1("Loading DBC file on x64 via CAN bridge: %s\n", strTempFileName);
-                if (!bAssociateCanDatabaseFromDbc(strTempFileName, !bDbcAssociationCreated, true, false)) {
+                const bool bCreateEditorForSelection = (nFileCount == 1) && (!bDbcAssociationCreated);
+                if (!bAssociateCanDatabaseFromDbc(strTempFileName, bCreateEditorForSelection, true, false)) {
                     bAllFilesImported = FALSE;
                     omStrMsg += strTempFileName;
                     omStrMsg += defNEW_LINE;
@@ -1424,30 +1437,27 @@ bool CMainFrame::bAssociateCanDatabaseFromDbc(CString omDbPath,
            bFromConfig ? "Config restore" : "Manual",
            omDbPath.GetString());
 
-    CString omCommittedDbPath;
-    GetCommittedImportedCanDatabasePath(omCommittedDbPath);
-    if (!omCommittedDbPath.IsEmpty() && omCommittedDbPath.CompareNoCase(omDbPath) != 0) {
-        if (bShowUserMessages) {
-            AfxMessageBox(_("x64 CAN DBC bridge currently supports one associated CAN DBC globally. "
-                            "Sequential/channel-based CAN DBC associations are not supported yet. "
-                            "Please cancel or close the existing association before loading a different DBC."),
-                          MB_OK | MB_ICONINFORMATION);
-        }
-        TRACE2("CAN DBC associate blocked by committed association. current=%s requested=%s\n",
-               omCommittedDbPath.GetString(), omDbPath.GetString());
-        return false;
-    }
-
     if (HasPendingImportedCanDatabasePreview()) {
         if (bShowUserMessages) {
-            AfxMessageBox(_("x64 CAN DBC bridge currently supports one associated CAN DBC globally. "
-                            "Sequential/channel-based CAN DBC associations are not supported yet."),
+            AfxMessageBox(_("Another CAN DBC is already being previewed. Please Accept or Cancel the current editor before loading a new one."),
                           MB_OK | MB_ICONINFORMATION);
         }
         TRACE1("CAN DBC associate blocked because a pending association is already active: %s\n",
                omDbPath.GetString());
         return false;
     }
+
+    if (HasCommittedImportedCanDatabasePath(omDbPath)) {
+        if (bShowUserMessages) {
+            AfxMessageBox(_("This CAN DBC is already associated globally. Select a different DBC to add another file."),
+                          MB_OK | MB_ICONINFORMATION);
+        }
+        TRACE1("CAN DBC associate skipped because the path is already committed: %s\n",
+               omDbPath.GetString());
+        return false;
+    }
+
+    ResetPreviewImportedCanDatabaseObject();
 
     if (!theApp.m_pouMsgSgInactive->bFillDataStructureFromDatabaseFile(omDbPath, PROTOCOL_CAN)) {
         CString logPath;
@@ -1481,9 +1491,6 @@ bool CMainFrame::bAssociateCanDatabaseFromDbc(CString omDbPath,
             TRACE1("CAN DBC preview preparation failed: %s\n", omDbPath.GetString());
             return false;
         }
-        CStringArray omDbNames;
-        omDbNames.Add(omDbPath);
-        theApp.m_pouMsgSignal->vSetDataBaseNames(&omDbNames);
         if (m_podMsgSgWnd != nullptr) {
             delete m_podMsgSgWnd;
             m_podMsgSgWnd = nullptr;
@@ -1494,6 +1501,7 @@ bool CMainFrame::bAssociateCanDatabaseFromDbc(CString omDbPath,
             if (bShowUserMessages) {
                 AfxMessageBox(_(MSG_MEMORY_CONSTRAINT), MB_OK | MB_ICONINFORMATION);
             }
+            DiscardImportedCanDatabasePreview();
             return false;
         }
 
@@ -1506,6 +1514,7 @@ bool CMainFrame::bAssociateCanDatabaseFromDbc(CString omDbPath,
             if (bShowUserMessages) {
                 MessageBox(_("Create BUSMASTER Database Window Failed!"), nullptr, MB_OK | MB_ICONERROR);
             }
+            DiscardImportedCanDatabasePreview();
             return false;
         }
         m_podMsgSgWnd->ShowWindow(SW_SHOWNORMAL);
@@ -1521,16 +1530,13 @@ bool CMainFrame::bAssociateCanDatabaseFromDbc(CString omDbPath,
         TRACE1("CAN DBC commit preparation failed: %s\n", omDbPath.GetString());
         return false;
     }
-
-    CStringArray omDbNames;
-    omDbNames.Add(omDbPath);
-    theApp.m_pouMsgSignal->vSetDataBaseNames(&omDbNames);
     if (!CommitImportedCanDatabasePreview()) {
         if (bShowUserMessages) {
             AfxMessageBox(_("CAN database was imported, but transmit support could not be registered for the imported CAN frames."),
                           MB_OK | MB_ICONSTOP);
         }
         TRACE1("CAN DBC associate imported but transmit registration failed: %s\n", omDbPath.GetString());
+        DiscardImportedCanDatabasePreview();
         return false;
     }
     return true;
@@ -8714,7 +8720,9 @@ void CMainFrame::OnDissociateDatabase()
 #endif
         {
             for (auto dbPath : dbPathList) {
-                m_ouBusmasterNetwork->DeleteDBService( CAN, 0, dbPath );
+                if (!RemoveCommittedImportedCanDatabase(CString(dbPath.c_str()))) {
+                    m_ouBusmasterNetwork->DeleteDBService( CAN, 0, dbPath );
+                }
             }
         }
         ////////////////////////////////////////////////////////////
@@ -11366,7 +11374,7 @@ int CMainFrame::nLoadXMLConfiguration()
                 if( nullptr != pPathObject ) {
                     pNodeSet = pPathObject->nodesetval;
 
-                    bool bCanDbcConfigLoaded = false;
+                    CStringArray loadedCanDbcPaths;
                     if(nullptr != pNodeSet) {
                         for(int i=0; i < pNodeSet->nodeNr; i++) {
                             if (  nullptr != pNodeSet->nodeTab[i]->xmlChildrenNode ) {
@@ -11375,14 +11383,22 @@ int CMainFrame::nLoadXMLConfiguration()
 #if defined(_WIN64)
                                     CString omDbPath = (const char*)ptext;
                                     if (omDbPath.Right(4).CompareNoCase(_T(".dbc")) == 0) {
-                                        if (bCanDbcConfigLoaded) {
-                                            TRACE1("Config restore ignored additional CAN DBC entry in x64: %s\n", omDbPath.GetString());
+                                        bool bAlreadyLoaded = false;
+                                        for (INT nLoaded = 0; nLoaded < loadedCanDbcPaths.GetSize(); ++nLoaded) {
+                                            if (loadedCanDbcPaths.GetAt(nLoaded).CompareNoCase(omDbPath) == 0) {
+                                                bAlreadyLoaded = true;
+                                                break;
+                                            }
+                                        }
+                                        if (bAlreadyLoaded) {
+                                            TRACE1("Config restore ignored duplicate CAN DBC entry in x64: %s\n", omDbPath.GetString());
                                         }
                                         else if (!bAssociateCanDatabaseFromDbc(omDbPath, false, false, true)) {
                                             TRACE1("Config restore failed to import CAN DBC: %s\n", omDbPath.GetString());
                                         }
                                         else {
-                                            bCanDbcConfigLoaded = true;
+                                            loadedCanDbcPaths.Add(omDbPath);
+                                            TRACE1("Config restore imported CAN DBC: %s\n", omDbPath.GetString());
                                         }
                                     }
                                     else
@@ -12942,6 +12958,7 @@ void CMainFrame::vClearDbInfo(ETYPE_BUS eBus)
         {
             m_ouBusmasterNetwork->ReSetNetwork( CAN );
             m_ouBusmasterNetwork->SetChannelCount( CAN, 1 );
+            ResetImportedCanDatabaseAssociations();
         }
         break;
         case J1939:

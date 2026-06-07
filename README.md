@@ -68,12 +68,12 @@ Supported x64 CAN database flow:
   units, and enumerated values are preserved through the converter.
 - Unsupported database formats fail with a user-visible message instead of a
   silent DLL load error.
-- The x64 CAN DBC bridge currently supports one associated CAN DBC globally.
-  It does not yet support channel-based associations such as `CAN1/FileA.dbc`
-  and `CAN2/FileB.dbc`; that is a future PR.
-- File dialog multi-select is unrelated to this limit. The bridge is
-  intentionally single-association in x64 even when only one file is chosen at
-  a time.
+- The x64 CAN DBC bridge supports multiple associated CAN DBCs globally on
+  CAN channel 0, mirroring the original BUSMASTER CAN DBF behavior.
+- It does not use channel-based associations such as `CAN1/FileA.dbc` and
+  `CAN2/FileB.dbc`; that remains a future PR if ever needed.
+- File dialog multi-select is unrelated to the global association model. Each
+  `.dbc` is still associated globally on CAN channel 0.
 
 The deploy step also copies `BUSMASTER.chm` from `Sources/BUSMASTER/BIN/Release`
 into the runtime folder so the Help menu and the Test Automation Editor help
@@ -91,7 +91,7 @@ It currently checks:
 - runtime deployment for `NovoBusAnalyzer.exe`
 - deployment of `DBC2DBFConverter.dll` and `DBC2DBFConverterLibrary.dll`
 - x64 PE architecture for `DBC2DBFConverter.dll`
-- presence of the CAN smoke sample DBC file
+- presence of the CAN smoke sample DBC files
 - creation of a standalone portable ZIP artifact
 - creation of an NSIS installer artifact
 
@@ -106,9 +106,9 @@ The workflow publishes two artifacts:
 - a portable ZIP that can be unzipped and run directly without installing
 
 The portable ZIP includes the Release runtime folder and the CAN smoke sample
-DBC. Like the normal runtime, it may still require a compatible Windows runtime
-and/or VC++ redistributable on a clean machine if those dependencies are not
-already present or bundled.
+DBCs under `Samples\CAN`. Like the normal runtime, it may still require a
+compatible Windows runtime and/or VC++ redistributable on a clean machine if
+those dependencies are not already present or bundled.
 
 Run the selected configuration directly:
 

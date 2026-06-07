@@ -114,6 +114,8 @@ jobs:
             Join-Path $relDir 'ConverterPlugins\DBC2DBFConverterLibrary.dll'
             Join-Path $relDir 'BUSMASTER.chm'
             'Tests\Samples\CAN\dbc_smoke.dbc'
+            'Tests\Samples\CAN\dbc_smoke_a.dbc'
+            'Tests\Samples\CAN\dbc_smoke_b.dbc'
           )
 
           foreach ($path in $required) {
@@ -155,7 +157,7 @@ jobs:
           $releaseDir = Join-Path $env:GITHUB_WORKSPACE 'build_ci\Sources\BUSMASTER\Application\Release'
           $portableDir = Join-Path $env:RUNNER_TEMP 'NovoBusAnalyzer-portable-x64'
           $zipPath = Join-Path $env:RUNNER_TEMP 'NovoBusAnalyzer-portable-x64.zip'
-          $sampleSource = Join-Path $env:GITHUB_WORKSPACE 'Tests\Samples\CAN\dbc_smoke.dbc'
+          $sampleSource = Join-Path $env:GITHUB_WORKSPACE 'Tests\Samples\CAN'
 
           if (Test-Path $portableDir) {
             Remove-Item $portableDir -Recurse -Force
@@ -169,7 +171,7 @@ jobs:
 
           $samplesDir = Join-Path $portableDir 'Samples\CAN'
           New-Item -ItemType Directory -Force -Path $samplesDir | Out-Null
-          Copy-Item $sampleSource $samplesDir -Force
+          Copy-Item (Join-Path $sampleSource '*.dbc') $samplesDir -Force
 
           Get-ChildItem -Path $portableDir -Recurse -Include *.ilk,*.exp,*.obj,*.pdb | Remove-Item -Force -ErrorAction SilentlyContinue
 
@@ -215,6 +217,8 @@ jobs:
             Join-Path $unzipDir 'ConverterPlugins\DBC2DBFConverterLibrary.dll'
             Join-Path $unzipDir 'BUSMASTER.chm'
             Join-Path $unzipDir 'Samples\CAN\dbc_smoke.dbc'
+            Join-Path $unzipDir 'Samples\CAN\dbc_smoke_a.dbc'
+            Join-Path $unzipDir 'Samples\CAN\dbc_smoke_b.dbc'
           )
 
           foreach ($path in $required) {
@@ -254,7 +258,7 @@ jobs:
           New-Item -ItemType Directory -Force -Path $installerDir | Out-Null
 
           $releaseDir = Join-Path $env:GITHUB_WORKSPACE 'build_ci\Sources\BUSMASTER\Application\Release'
-          $sampleDbc = Join-Path $env:GITHUB_WORKSPACE 'Tests\Samples\CAN\dbc_smoke.dbc'
+          $sampleCanDir = Join-Path $env:GITHUB_WORKSPACE 'Tests\Samples\CAN'
           $installerOut = Join-Path $installerDir 'NovoBusAnalyzer_Setup.exe'
           $nsisScript = Join-Path $env:GITHUB_WORKSPACE 'packaging\ci_novobusanalyzer_installer.nsi'
           $nsisExe = Join-Path ${env:ProgramFiles(x86)} 'NSIS\makensis.exe'
@@ -265,7 +269,7 @@ jobs:
 
           & $nsisExe `
             "/DRELEASE_DIR=$releaseDir" `
-            "/DSAMPLE_DBC=$sampleDbc" `
+            "/DSAMPLE_CAN_DIR=$sampleCanDir" `
             "/DOUTFILE=$installerOut" `
             $nsisScript
 

@@ -499,21 +499,4 @@ void CMsgSignalDBWnd::vDiscardImportedAssociation()
         TRACE1("CAN DBC preview discard failed: %s\n", m_sDbParams.m_omDBPath.GetString());
     }
 
-    CMainFrame* pFrame = static_cast<CMainFrame*>(AfxGetApp()->m_pMainWnd);
-    if (pFrame != nullptr)
-    {
-        CStringArray omRemainingDbNames;
-        if (m_sDbParams.m_pouMsgSignalImportedDBs != nullptr)
-        {
-            m_sDbParams.m_pouMsgSignalImportedDBs->vGetDataBaseNames(&omRemainingDbNames);
-        }
-        const BOOL bHasRemainingDb = (omRemainingDbNames.GetSize() > 0) ? TRUE : FALSE;
-        CFlags* pFlags = theApp.pouGetFlagsPtr();
-        if (pFlags != nullptr)
-        {
-            pFlags->vSetFlagStatus(DBOPEN, bHasRemainingDb);
-            pFlags->vSetFlagStatus(SELECTDATABASEFILE, bHasRemainingDb);
-        }
-        pFrame->SendMessage(WM_DATABASE_CHANGE, (WPARAM)bHasRemainingDb, 0);
-    }
 }

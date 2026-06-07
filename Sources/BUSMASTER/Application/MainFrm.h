@@ -266,6 +266,7 @@ public:
                                       bool bShowUserMessages,
                                       bool bFromConfig);
     bool bCommitCanDatabaseAssociation(CString omDbPath, bool bShowUserMessages);
+    void vNotifyCanDatabaseChange(bool bAdded);
     void vOnCanDatabaseEditorClosed();
     void vCloseDatabaseWindow(bool bPromptSave, bool bUpdateFlags = true);
     DWORD dLoadJ1939DBFile(CString omStrActiveDataBase, bool bFrmCom);

@@ -71,6 +71,10 @@ extern bool CommitImportedCanDatabasePreview();
 extern bool DiscardImportedCanDatabasePreview();
 extern bool HasPendingImportedCanDatabasePreview();
 extern bool HasCommittedImportedCanDatabase();
+extern bool HasCommittedImportedCanDatabasePath(const CString& dbPath);
+extern void GetCommittedImportedCanDatabasePaths(CStringArray& dbPaths);
 extern void GetCommittedImportedCanDatabasePath(CString& dbPath);
+extern bool RemoveCommittedImportedCanDatabase(const CString& dbPath);
+extern void ResetImportedCanDatabaseAssociations();
 
 #endif // BUSMASTER_APPLICATION_INTERFACEGETTER_H_

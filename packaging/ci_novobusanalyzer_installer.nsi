@@ -21,7 +21,7 @@ Section "NovoBusAnalyzer" SEC_MAIN
   File /r "${RELEASE_DIR}\*"
 
   SetOutPath "$INSTDIR\Samples\CAN"
-  File /oname=dbc_smoke.dbc "${SAMPLE_DBC}"
+  File /r "${SAMPLE_CAN_DIR}\*.dbc"
 
   WriteUninstaller "$INSTDIR\uninst.exe"
 SectionEnd
