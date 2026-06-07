@@ -92,6 +92,14 @@
 #define IDC_COMB_SAMPOINT               3011
 #define IDC_EDIT_CHANNEL_DESC           3012
 #define IDC_COMB_BAUD_RATE              3013
+#define IDD_DLG_NEOVI_DEVICE_DISCOVERY  3014
+#define IDC_LIST_NEOVI_DEVICES          3015
+#define IDC_EDIT_NEOVI_MANUAL_IP        3016
+#define IDC_BUTTON_NEOVI_REFRESH        3017
+#define IDC_STATIC_NEOVI_STATUS         3018
+#define IDC_BUTTON_NEOVI_DISCOVER       3019
+#define IDC_EDIT_NEOVI_LOCATION         3020
+#define IDC_STATIC_NEOVI_DEVICE         3021
 
 // Next default values for new objects
 //
@@ -99,7 +107,7 @@
 #ifndef APSTUDIO_READONLY_SYMBOLS
 #define _APS_NEXT_RESOURCE_VALUE        3008
 #define _APS_NEXT_COMMAND_VALUE         32771
-#define _APS_NEXT_CONTROL_VALUE         3014
+#define _APS_NEXT_CONTROL_VALUE         3022
 #define _APS_NEXT_SYMED_VALUE           3000
 #endif
 #endif

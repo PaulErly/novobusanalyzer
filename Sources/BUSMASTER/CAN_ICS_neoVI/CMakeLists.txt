@@ -6,6 +6,7 @@ set(sources
   CAN_ICS_neoVI_Network.cpp
   CAN_ICS_neoVI_stdafx.cpp
   CANRegAnalysis_CAN_ICS_neoVI.cpp
+  NeoVIDeviceDiscoveryDlg.cpp
   ChangeRegisters_CAN_ICS_neoVI.cpp
   ../Application/MultiLanguage.cpp
   ../DIL_Interface/HardwareListingCAN.cpp
@@ -19,6 +20,7 @@ set(headers
   CAN_ICS_neoVI_Resource.h
   CAN_ICS_neoVI_stdafx.h
   ChangeRegDefines.h
+  NeoVIDeviceDiscovery.h
   ChangeRegisters_CAN_ICS_neoVI.h
   ContrConfigPeakUsbDefs.h
   ../Application/MultiLanguage.h)

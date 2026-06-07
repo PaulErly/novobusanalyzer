@@ -12898,6 +12898,10 @@ void CMainFrame::LoadControllerConfigData(SCONTROLLER_DETAILS& sController, xmlN
         {
             sController.m_omHardwareDesc = strVar.c_str();
         }
+        if (xmlUtils::GetDataFrmNode(pNodePtr,"Location",strVar))
+        {
+            sController.m_omStrLocation = strVar.c_str();
+        }
         //CANFD
         if (xmlUtils::GetDataFrmNode(pNodePtr,"CANFD_BaudRate",strVar))
         {
