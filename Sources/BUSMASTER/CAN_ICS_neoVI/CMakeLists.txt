@@ -37,6 +37,9 @@ include_directories(
 
 # compiler options
 add_definitions(-D_USRDLL)
+if(DEFINED NEOVI_SDK_DIR AND NOT NEOVI_SDK_DIR STREQUAL "")
+  target_compile_definitions(${PROJECT_NAME} PRIVATE NEOVI_SDK_DIR="${NEOVI_SDK_DIR}")
+endif()
 
 # linker options
 set_target_properties(${PROJECT_NAME} PROPERTIES LINK_FLAGS "/NODEFAULTLIB:daouuid")

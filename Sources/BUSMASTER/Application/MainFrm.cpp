@@ -95,6 +95,7 @@
 #include "UI/BusmasterMenuItem.h"
 #include "DataTypes/NSCodeGenHelperFactory.h"
 #include <shellapi.h>
+#include <vector>
 
 #define MSG_GET_CONFIGPATH  10000
 #define FromXMLFile 1 //To show the called InitializeDil() is from XmlConfig
@@ -173,6 +174,56 @@ namespace
 
         PathRemoveFileSpec(szPath);
         return CString(szPath);
+    }
+
+    bool bFileExists(const CString& path)
+    {
+        return !path.IsEmpty() && (GetFileAttributes(path) != INVALID_FILE_ATTRIBUTES);
+    }
+
+    void vAppendNeoViCandidates(std::vector<CString>& paths, const CString& rootDir)
+    {
+        if (rootDir.IsEmpty())
+        {
+            return;
+        }
+
+        paths.push_back(rootDir + _T("\\icsneo40.dll"));
+        paths.push_back(rootDir + _T("\\bin\\icsneo40.dll"));
+        paths.push_back(rootDir + _T("\\bin\\x64\\icsneo40.dll"));
+        paths.push_back(rootDir + _T("\\x64\\icsneo40.dll"));
+    }
+
+    bool bIsNeoViRuntimeAvailable()
+    {
+        std::vector<CString> candidates;
+        const CString moduleDir = GetModuleDirectory();
+        vAppendNeoViCandidates(candidates, moduleDir);
+
+        TCHAR szSystemDir[MAX_PATH] = {};
+        if (GetSystemDirectory(szSystemDir, MAX_PATH) != 0)
+        {
+            vAppendNeoViCandidates(candidates, CString(szSystemDir));
+        }
+
+        const TCHAR* const envVars[] = { _T("INTREPID_SDK_DIR"), _T("NEOVI_SDK_DIR"), _T("INTREPID_NEOVI_DIR") };
+        for (const TCHAR* envVar : envVars)
+        {
+            TCHAR szValue[MAX_PATH] = {};
+            if (GetEnvironmentVariable(envVar, szValue, MAX_PATH) > 0)
+            {
+                vAppendNeoViCandidates(candidates, CString(szValue));
+            }
+        }
+
+        for (const auto& candidate : candidates)
+        {
+            if (bFileExists(candidate))
+            {
+                return true;
+            }
+        }
+        return false;
     }
 
     bool LaunchExecutable(const CString& executablePath, const CString& arguments, const CString& workingDirectory, UINT* pError = nullptr)
@@ -9278,7 +9329,24 @@ HRESULT CMainFrame::IntializeDIL(UINT unDefaultChannelCnt, bool bLoadedFromXml)
         {
             if ( hResult!=DAL_ALREADY_SELECTED )
             {
-                theApp.bWriteIntoTraceWnd(_("Driver selection failed"));
+                if (m_dwDriverId == DRIVER_CAN_ICS_NEOVI)
+                {
+                    std::string oNeoViError;
+                    if (g_pouDIL_CAN_Interface->DILC_GetLastErrorString(oNeoViError) == S_OK && !oNeoViError.empty())
+                    {
+                        theApp.bWriteIntoTraceWnd(const_cast<char*>(oNeoViError.c_str()));
+                        AfxMessageBox(oNeoViError.c_str(), MB_ICONERROR | MB_OK);
+                    }
+                    else
+                    {
+                        theApp.bWriteIntoTraceWnd(_("neoVI driver disabled: Intrepid SDK/runtime not found"));
+                        AfxMessageBox(_("neoVI driver disabled: Intrepid SDK/runtime not found"), MB_ICONERROR | MB_OK);
+                    }
+                }
+                else
+                {
+                    theApp.bWriteIntoTraceWnd(_("Driver selection failed"));
+                }
                 m_dwDriverId = DRIVER_CAN_STUB;          //select simulation
                 IntializeDIL();
 
@@ -13515,6 +13583,12 @@ void CMainFrame::OnUpdateSelectDriver(CCmdUI* pCmdUI)
         if (bConnected == FALSE) {
             pCmdUI->Enable(!bSelected);
         } else {
+            pCmdUI->Enable(FALSE);
+        }
+    }
+
+    if (psCurrDIL != nullptr && psCurrDIL->m_dwDriverID == DRIVER_CAN_ICS_NEOVI) {
+        if (!bIsNeoViRuntimeAvailable()) {
             pCmdUI->Enable(FALSE);
         }
     }

@@ -75,6 +75,46 @@ Supported x64 CAN database flow:
 - File dialog multi-select is unrelated to the global association model. Each
   `.dbc` is still associated globally on CAN channel 0.
 
+## Intrepid neoVI Ethernet CAN support
+
+The existing `IntrepidCS neoVI` / `CAN_ICS_neoVI` driver path is being
+modernized in place for Ethernet-connected neoVI devices and classic CAN.
+The first pass keeps the driver optional at runtime so the app and CI still
+build cleanly without Intrepid hardware or SDK files on the machine.
+
+How to enable the runtime path:
+- install the Intrepid neoVI SDK/runtime on the development machine
+- optionally point the build or runtime loader at the SDK root using
+  `INTREPID_SDK_DIR` or `NEOVI_SDK_DIR`
+- for Ethernet/manual IP testing, set `INTREPID_NEOVI_IP_ADDRESS` or
+  `NEOVI_IP_ADDRESS` before launching the app
+
+If the SDK/runtime cannot be found, the neoVI entry stays visible but is
+disabled and selecting it shows:
+`neoVI driver disabled: Intrepid SDK/runtime not found`
+
+This first implementation is intentionally limited to classic CAN and Ethernet
+device bring-up. USB, CAN FD, Vehicle Spy import, XCP, and other advanced
+neoVI features remain future work.
+
+Hardware validation is pending until the real device is available again. The
+manual checklist below is the path to follow once the hardware is in hand:
+
+1. Configure CMake with `ENABLE_NEOVI_DRIVER=ON` and the SDK/runtime path if
+   needed.
+2. Confirm the `CAN_ICS_neoVI` target builds and the runtime DLLs are deployed
+   beside the app.
+3. Select `IntrepidCS neoVI` in the CAN hardware menu.
+4. Connect the neoVI device over Ethernet and confirm the device opens.
+5. Verify the reported channel count matches the hardware or the configured
+   channel count.
+6. Receive a classic CAN frame on channel 1 and any additional channels
+   exposed by the hardware.
+7. Transmit a simple CAN frame on the selected channel.
+8. Associate a DBC and confirm decoded frames appear in the message window.
+9. Unplug Ethernet and confirm the app reports the disconnect cleanly.
+10. Reconnect if supported and verify the device can be opened again.
+
 The deploy step also copies `BUSMASTER.chm` from `Sources/BUSMASTER/BIN/Release`
 into the runtime folder so the Help menu and the Test Automation Editor help
 link can resolve locally.
