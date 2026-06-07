@@ -148,6 +148,88 @@ jobs:
           }
           Write-Host ("DBC2DBFConverter.dll machine=0x{0:X4}" -f $machine)
 
+      - name: Build portable ZIP
+        run: |
+          Write-Host ("[{0}] portable build start" -f (Get-Date).ToString("o"))
+
+          $releaseDir = Join-Path $env:GITHUB_WORKSPACE 'build_ci\Sources\BUSMASTER\Application\Release'
+          $portableDir = Join-Path $env:RUNNER_TEMP 'NovoBusAnalyzer-portable-x64'
+          $zipPath = Join-Path $env:RUNNER_TEMP 'NovoBusAnalyzer-portable-x64.zip'
+          $sampleSource = Join-Path $env:GITHUB_WORKSPACE 'Tests\Samples\CAN\dbc_smoke.dbc'
+
+          if (Test-Path $portableDir) {
+            Remove-Item $portableDir -Recurse -Force
+          }
+          if (Test-Path $zipPath) {
+            Remove-Item $zipPath -Force
+          }
+
+          New-Item -ItemType Directory -Force -Path $portableDir | Out-Null
+          Copy-Item (Join-Path $releaseDir '*') $portableDir -Recurse -Force
+
+          $samplesDir = Join-Path $portableDir 'Samples\CAN'
+          New-Item -ItemType Directory -Force -Path $samplesDir | Out-Null
+          Copy-Item $sampleSource $samplesDir -Force
+
+          Get-ChildItem -Path $portableDir -Recurse -Include *.ilk,*.exp,*.obj,*.pdb | Remove-Item -Force -ErrorAction SilentlyContinue
+
+          Compress-Archive -Path (Join-Path $portableDir '*') -DestinationPath $zipPath -Force
+          if (-not (Test-Path $zipPath)) {
+            throw "Portable ZIP was not created: $zipPath"
+          }
+
+          Get-Item $zipPath | Select-Object FullName, Length, LastWriteTime | Format-List
+          Write-Host ("[{0}] portable build end" -f (Get-Date).ToString("o"))
+
+      - name: Validate portable ZIP
+        run: |
+          Write-Host ("[{0}] portable validate start" -f (Get-Date).ToString("o"))
+
+          function Get-PeMachine {
+            param([string]$Path)
+            $fs = [System.IO.File]::OpenRead($Path)
+            try {
+              $br = New-Object System.IO.BinaryReader($fs)
+              $fs.Seek(0x3C, [System.IO.SeekOrigin]::Begin) | Out-Null
+              $peOffset = $br.ReadInt32()
+              $fs.Seek($peOffset + 4, [System.IO.SeekOrigin]::Begin) | Out-Null
+              return $br.ReadUInt16()
+            }
+            finally {
+              $fs.Dispose()
+            }
+          }
+
+          $zipPath = Join-Path $env:RUNNER_TEMP 'NovoBusAnalyzer-portable-x64.zip'
+          $unzipDir = Join-Path $env:RUNNER_TEMP 'NovoBusAnalyzer-portable-x64-unpacked'
+
+          if (Test-Path $unzipDir) {
+            Remove-Item $unzipDir -Recurse -Force
+          }
+          New-Item -ItemType Directory -Force -Path $unzipDir | Out-Null
+          Expand-Archive -Path $zipPath -DestinationPath $unzipDir -Force
+
+          $required = @(
+            Join-Path $unzipDir 'NovoBusAnalyzer.exe'
+            Join-Path $unzipDir 'ConverterPlugins\DBC2DBFConverter.dll'
+            Join-Path $unzipDir 'ConverterPlugins\DBC2DBFConverterLibrary.dll'
+            Join-Path $unzipDir 'BUSMASTER.chm'
+            Join-Path $unzipDir 'Samples\CAN\dbc_smoke.dbc'
+          )
+
+          foreach ($path in $required) {
+            if (-not (Test-Path $path)) {
+              throw "Missing expected portable file: $path"
+            }
+          }
+
+          $dll = Join-Path $unzipDir 'ConverterPlugins\DBC2DBFConverter.dll'
+          $machine = Get-PeMachine -Path $dll
+          if ($machine -ne 0x8664) {
+            throw "Portable DBC2DBFConverter.dll is not x64. Machine=0x{0:X4}" -f $machine
+          }
+          Write-Host ("Portable DBC2DBFConverter.dll machine=0x{0:X4}" -f $machine)
+
       - name: Install NSIS
         run: |
           $makensis = Get-Command makensis.exe -ErrorAction SilentlyContinue
@@ -213,6 +295,13 @@ jobs:
         with:
           name: busmaster-windows-installer
           path: build_ci\installer\NovoBusAnalyzer_Setup.exe
+          if-no-files-found: error
+
+      - name: Upload portable ZIP artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: NovoBusAnalyzer-portable-x64
+          path: ${{ runner.temp }}\NovoBusAnalyzer-portable-x64.zip
           if-no-files-found: error
 
       - name: Mark workflow end

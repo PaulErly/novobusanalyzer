@@ -92,12 +92,23 @@ It currently checks:
 - deployment of `DBC2DBFConverter.dll` and `DBC2DBFConverterLibrary.dll`
 - x64 PE architecture for `DBC2DBFConverter.dll`
 - presence of the CAN smoke sample DBC file
+- creation of a standalone portable ZIP artifact
+- creation of an NSIS installer artifact
 
 Debug x64 is intentionally left as a future TODO for the workflow so the CI
 job stays fast and focused on the shipping runtime path.
 
 It does not run the GUI interactively and it does not validate the
 DBManager-backed J1939, LDF, or Test Automation database workflows.
+
+The workflow publishes two artifacts:
+- the NSIS installer for normal installation
+- a portable ZIP that can be unzipped and run directly without installing
+
+The portable ZIP includes the Release runtime folder and the CAN smoke sample
+DBC. Like the normal runtime, it may still require a compatible Windows runtime
+and/or VC++ redistributable on a clean machine if those dependencies are not
+already present or bundled.
 
 Run the selected configuration directly:
 
