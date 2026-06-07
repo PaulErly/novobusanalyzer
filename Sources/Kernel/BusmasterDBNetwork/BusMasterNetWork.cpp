@@ -156,11 +156,17 @@ ERRORCODE BMNetwork::DeleteDBService(ETYPE_BUS eouProtocol, int nChannelIndex,
   std::string path;
   int index = 0;
   for (auto cluster : clusterList) {
+    if (cluster == nullptr) {
+      index++;
+      continue;
+    }
     cluster->GetDBFilePath(path);
     if (path == dbPath) {
       if (EC_SUCCESS == m_ouProtocolConfig[eouProtocol].ReleaseDbService(
                             nChannelIndex, index)) {
-        mDbManagerAcessor.mFreeCluster(cluster);
+        if (mDbManagerAcessor.mFreeCluster != nullptr) {
+          mDbManagerAcessor.mFreeCluster(cluster);
+        }
         IDbChangeListner::DBChangeInfo changeInfo;
         changeInfo.mBusType = eouProtocol;
         changeInfo.mChannel = nChannelIndex;
@@ -172,6 +178,17 @@ ERRORCODE BMNetwork::DeleteDBService(ETYPE_BUS eouProtocol, int nChannelIndex,
       }
     }
     index++;
+  }
+  return EC_FAILURE;
+}
+
+ERRORCODE BMNetwork::ReleaseDBService(ETYPE_BUS eouProtocol, int nChannelIndex,
+                                      int nDBIndex) {
+  int nChannelsConfigured = 0;
+  m_ouProtocolConfig[eouProtocol].GetChannelCount(nChannelsConfigured);
+  if (nChannelIndex < nChannelsConfigured) {
+    return m_ouProtocolConfig[eouProtocol].ReleaseDbService(nChannelIndex,
+                                                            nDBIndex);
   }
   return EC_FAILURE;
 }

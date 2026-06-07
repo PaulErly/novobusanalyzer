@@ -26,6 +26,7 @@
 #include "BUSMASTER.h"        // App class header file
 #include "MsgSignalDBWnd.h"     // Class defintion included here
 #include "MainFrm.h"            // Pointer to this class is defined here
+#include "InterfaceGetter.h"    // Imported CAN association helpers
 #include "MsgSgTreeView.h"      // Forms the left pane
 //#include "MsgSgDetView.h"       // Forms the right pane
 #include "Flags.h"              // DBOPEN flag to be set/reset is defined here
@@ -83,8 +84,12 @@ CMsgSignalDBWnd::~CMsgSignalDBWnd()
 BEGIN_MESSAGE_MAP(CMsgSignalDBWnd, CMDIChildWnd)
     //{{AFX_MSG_MAP(CMsgSignalDBWnd)
     ON_WM_CLOSE()
+    ON_WM_SIZE()
     ON_MESSAGE(WM_SAVE_DBJ1939, OnSaveDBJ1939)
     ON_MESSAGE(WM_UPDATE_DATABASEEDITOR, UpdateSignalDetails)
+    ON_MESSAGE(WM_APP + 104, OnDeferredLayout)
+    ON_BN_CLICKED(IDC_BTN_DBEDITOR_ACCEPT, OnAcceptAssociation)
+    ON_BN_CLICKED(IDC_BTN_DBEDITOR_CANCEL, OnCancelAssociation)
     //}}AFX_MSG_MAP
 END_MESSAGE_MAP()
 
@@ -107,6 +112,7 @@ END_MESSAGE_MAP()
 BOOL CMsgSignalDBWnd::PreCreateWindow(CREATESTRUCT& cs)
 {
     cs.style |= WS_OVERLAPPEDWINDOW;
+    cs.style &= ~(WS_THICKFRAME | WS_MAXIMIZEBOX | WS_MINIMIZEBOX);
 
     return CMDIChildWnd::PreCreateWindow(cs);
 }
@@ -174,6 +180,17 @@ BOOL CMsgSignalDBWnd::OnCreateClient(LPCREATESTRUCT /*lpcs*/,
                                         om_Size,                        //CSize( 350,100 ),                 // Sizeof Pane
                                         pContext);
     }
+
+    vCreateFooterButtons();
+    m_bLayoutReady = false;
+    if (GetSafeHwnd() != nullptr)
+    {
+        CRect rcClient;
+        GetClientRect(&rcClient);
+        vLayoutSplitterColumns(rcClient.right);
+    }
+    PostMessage(WM_APP + 104, 0, 0);
+
     CString omTitle = _("DatabaseEditor - ");
     omTitle += m_sDbParams.m_omBusName;
     SetWindowText(omTitle.GetBuffer(MAX_PATH));
@@ -203,11 +220,13 @@ void CMsgSignalDBWnd::vCalculateSplitterPosition(CSize& cSize)
     RECT sRect;
 
     // Get its size
-    GetWindowRect( &sRect );
+    GetClientRect(&sRect);
 
     // Calculate splitter position
-    cSize.cx = sRect.right / 3;
-    cSize.cy = sRect.bottom / 4;
+    const int nClientWidth = max(0, sRect.right - sRect.left);
+    const int nClientHeight = max(0, sRect.bottom - sRect.top);
+    cSize.cx = max(320, (nClientWidth * 39) / 100);
+    cSize.cy = max(240, nClientHeight - 56);
 
 }
 /******************************************************************************/
@@ -236,6 +255,16 @@ void CMsgSignalDBWnd::vCalculateSplitterPosition(CSize& cSize)
 
 void CMsgSignalDBWnd::OnClose()
 {
+    if (m_bKeepAssociationOnClose)
+    {
+        if (CMainFrame* pFrame = static_cast<CMainFrame*>(AfxGetApp()->m_pMainWnd))
+        {
+            pFrame->vOnCanDatabaseEditorClosed();
+        }
+        CMDIChildWnd::OnClose();
+        return;
+    }
+
     // Get active frame
     CMainFrame* pFrame =
         static_cast<CMainFrame*> (AfxGetApp()->m_pMainWnd);
@@ -361,4 +390,135 @@ LRESULT CMsgSignalDBWnd::UpdateSignalDetails(WPARAM /*wParam*/, LPARAM /*lParam*
         pView->UpdateSignalDetails();
     }
     return S_OK;
+}
+
+void CMsgSignalDBWnd::OnSize(UINT nType, int cx, int cy)
+{
+    CMDIChildWnd::OnSize(nType, cx, cy);
+    if (!m_bLayoutReady || !m_bSplitWndCreated || m_omSplitterWnd.GetSafeHwnd() == nullptr)
+    {
+        return;
+    }
+    vLayoutFooterButtons(cx, cy);
+}
+
+LRESULT CMsgSignalDBWnd::OnDeferredLayout(WPARAM, LPARAM)
+{
+    if (!m_bSplitWndCreated || m_omSplitterWnd.GetSafeHwnd() == nullptr || GetSafeHwnd() == nullptr)
+    {
+        return 0;
+    }
+
+    CRect rcClient;
+    GetClientRect(&rcClient);
+    if (rcClient.right <= 0 || rcClient.bottom <= 0)
+    {
+        return 0;
+    }
+
+    m_bLayoutReady = true;
+    vLayoutFooterButtons(rcClient.right, rcClient.bottom);
+    return 0;
+}
+
+void CMsgSignalDBWnd::vCreateFooterButtons()
+{
+    if (m_omBtnAccept.GetSafeHwnd() == nullptr)
+    {
+        const DWORD dwStyle = WS_CHILD | WS_VISIBLE | BS_DEFPUSHBUTTON;
+        m_omBtnAccept.Create(_T("Accept"), dwStyle, CRect(0, 0, 0, 0), this, IDC_BTN_DBEDITOR_ACCEPT);
+    }
+
+    if (m_omBtnCancel.GetSafeHwnd() == nullptr)
+    {
+        const DWORD dwStyle = WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON;
+        m_omBtnCancel.Create(_T("Cancel"), dwStyle, CRect(0, 0, 0, 0), this, IDC_BTN_DBEDITOR_CANCEL);
+    }
+}
+
+void CMsgSignalDBWnd::vLayoutFooterButtons(int cx, int cy)
+{
+    if (GetSafeHwnd() == nullptr)
+    {
+        return;
+    }
+
+    CRect rcClient;
+    GetClientRect(&rcClient);
+    if (cx > 0 && cy > 0)
+    {
+        rcClient.right = cx;
+        rcClient.bottom = cy;
+    }
+
+    const int nFooterHeight = 44;
+    const int nBtnW = 80;
+    const int nBtnH = 24;
+    const int nGap = 8;
+    const int nBottom = 10;
+    const int nRight = 12;
+
+    const int nSplitterHeight = max(0, rcClient.bottom - nFooterHeight);
+    if (m_omSplitterWnd.GetSafeHwnd() != nullptr)
+    {
+        m_omSplitterWnd.MoveWindow(0, 0, rcClient.right, nSplitterHeight, TRUE);
+        vLayoutSplitterColumns(rcClient.right);
+    }
+
+    int y = max(0, nSplitterHeight + nBottom);
+    int xCancel = max(0, rcClient.right - nRight - nBtnW);
+    int xAccept = max(0, xCancel - nGap - nBtnW);
+
+    if (m_omBtnAccept.GetSafeHwnd() != nullptr)
+    {
+        m_omBtnAccept.MoveWindow(xAccept, y, nBtnW, nBtnH, TRUE);
+    }
+    if (m_omBtnCancel.GetSafeHwnd() != nullptr)
+    {
+        m_omBtnCancel.MoveWindow(xCancel, y, nBtnW, nBtnH, TRUE);
+    }
+
+    m_bLayoutReady = true;
+}
+
+void CMsgSignalDBWnd::vLayoutSplitterColumns(int cx)
+{
+    if (m_omSplitterWnd.GetSafeHwnd() == nullptr)
+    {
+        return;
+    }
+
+    const int nClientWidth = max(0, cx);
+    const int nTreeWidth = max(320, (nClientWidth * 39) / 100);
+    const int nDetailWidth = max(320, nClientWidth - nTreeWidth);
+    m_omSplitterWnd.SetColumnInfo(FIRST_COL, nTreeWidth, 0);
+    m_omSplitterWnd.SetColumnInfo(SECOND_COL, nDetailWidth, 0);
+    m_omSplitterWnd.RecalcLayout();
+}
+
+void CMsgSignalDBWnd::OnAcceptAssociation()
+{
+    CMainFrame* pFrame = static_cast<CMainFrame*>(AfxGetApp()->m_pMainWnd);
+    if (pFrame != nullptr && !pFrame->bCommitCanDatabaseAssociation(m_sDbParams.m_omDBPath, true))
+    {
+        return;
+    }
+    m_bKeepAssociationOnClose = true;
+    PostMessage(WM_CLOSE, 0, 0);
+}
+
+void CMsgSignalDBWnd::OnCancelAssociation()
+{
+    vDiscardImportedAssociation();
+    m_bKeepAssociationOnClose = true;
+    PostMessage(WM_CLOSE, 0, 0);
+}
+
+void CMsgSignalDBWnd::vDiscardImportedAssociation()
+{
+    if (!DiscardImportedCanDatabasePreview())
+    {
+        TRACE1("CAN DBC preview discard failed: %s\n", m_sDbParams.m_omDBPath.GetString());
+    }
+
 }

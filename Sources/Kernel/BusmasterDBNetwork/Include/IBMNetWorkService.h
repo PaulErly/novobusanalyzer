@@ -13,6 +13,8 @@ class IBMNetWorkService : public IBMNetWorkGetService {
                                  int nDBIndex, ICluster*) = 0;
   virtual ERRORCODE DeleteDBService(ETYPE_BUS eouProtocol, int nChannelIndex,
                                     std::string dbPath) = 0;
+  virtual ERRORCODE ReleaseDBService(ETYPE_BUS eouProtocol, int nChannelIndex,
+                                     int nDBIndex) = 0;
   virtual ERRORCODE AddDBService(ETYPE_BUS eouProtocol, int nChannelIndex,
                                  ICluster*) = 0;
   virtual ERRORCODE LoadDb(ETYPE_BUS eouProtocol, int nChannelIndex,

@@ -110,6 +110,8 @@ class BMNetwork : public IBMNetWorkService {
   ERRORCODE AddDBService(ETYPE_BUS eouProtocol, int nChannelIndex, ICluster*);
   ERRORCODE DeleteDBService(ETYPE_BUS eouProtocol, int nChannelIndex,
                             std::string dbPath);
+  ERRORCODE ReleaseDBService(ETYPE_BUS eouProtocol, int nChannelIndex,
+                             int nDBIndex);
 
   ERRORCODE GetSimulatedEcuList(ETYPE_BUS, int nChannelIndex,
                                 std::list<IEcu*>&);

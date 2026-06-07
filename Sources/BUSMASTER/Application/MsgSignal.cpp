@@ -1010,6 +1010,17 @@ void CMsgSignal::bAddDbNameEntry(const CString& omDbFileName)
         m_omDatabaseNames.Add(omDbFileName);
     }
 }
+void CMsgSignal::bDeleteDbNameEntry(const CString& omDbFileName)
+{
+    for (int nCount = 0; nCount < m_omDatabaseNames.GetSize(); ++nCount)
+    {
+        if (0 == m_omDatabaseNames.GetAt(nCount).Compare(omDbFileName))
+        {
+            m_omDatabaseNames.RemoveAt(nCount);
+            return;
+        }
+    }
+}
 /******************************************************************************
   Function Name    :  omStrGetMessageNameFromMsgCode
 

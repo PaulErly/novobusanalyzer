@@ -261,6 +261,14 @@ public:
     
     // To create the trace window
     bool bCreateTraceWindow();
+    bool bAssociateCanDatabaseFromDbc(CString omDbPath,
+                                      bool bCreateEditor,
+                                      bool bShowUserMessages,
+                                      bool bFromConfig);
+    bool bCommitCanDatabaseAssociation(CString omDbPath, bool bShowUserMessages);
+    void vNotifyCanDatabaseChange(bool bAdded);
+    void vOnCanDatabaseEditorClosed();
+    void vCloseDatabaseWindow(bool bPromptSave, bool bUpdateFlags = true);
     DWORD dLoadJ1939DBFile(CString omStrActiveDataBase, bool bFrmCom);
     // To load specified configuration File
     DWORD dLoadDataBaseFile(CString omStrActiveDataBase, bool bFrmCom);

@@ -68,10 +68,47 @@ Supported x64 CAN database flow:
   units, and enumerated values are preserved through the converter.
 - Unsupported database formats fail with a user-visible message instead of a
   silent DLL load error.
+- The x64 CAN DBC bridge supports multiple associated CAN DBCs globally on
+  CAN channel 0, mirroring the original BUSMASTER CAN DBF behavior.
+- It does not use channel-based associations such as `CAN1/FileA.dbc` and
+  `CAN2/FileB.dbc`; that remains a future PR if ever needed.
+- File dialog multi-select is unrelated to the global association model. Each
+  `.dbc` is still associated globally on CAN channel 0.
 
 The deploy step also copies `BUSMASTER.chm` from `Sources/BUSMASTER/BIN/Release`
 into the runtime folder so the Help menu and the Test Automation Editor help
 link can resolve locally.
+
+## CI Windows Build
+
+The GitHub Actions workflow at `.github/workflows/windows-build.yml` validates
+that the modern x64 BUSMASTER build configures and compiles on a clean Windows
+runner using the closest available Microsoft toolchain on GitHub-hosted
+machines. It installs Qt 6.8.3 through `jurplel/install-qt-action`.
+
+It currently checks:
+- Release x64 build only
+- runtime deployment for `NovoBusAnalyzer.exe`
+- deployment of `DBC2DBFConverter.dll` and `DBC2DBFConverterLibrary.dll`
+- x64 PE architecture for `DBC2DBFConverter.dll`
+- presence of the CAN smoke sample DBC files
+- creation of a standalone portable ZIP artifact
+- creation of an NSIS installer artifact
+
+Debug x64 is intentionally left as a future TODO for the workflow so the CI
+job stays fast and focused on the shipping runtime path.
+
+It does not run the GUI interactively and it does not validate the
+DBManager-backed J1939, LDF, or Test Automation database workflows.
+
+The workflow publishes two artifacts:
+- the NSIS installer for normal installation
+- a portable ZIP that can be unzipped and run directly without installing
+
+The portable ZIP includes the Release runtime folder and the CAN smoke sample
+DBCs under `Samples\CAN`. Like the normal runtime, it may still require a
+compatible Windows runtime and/or VC++ redistributable on a clean machine if
+those dependencies are not already present or bundled.
 
 Run the selected configuration directly:
 
