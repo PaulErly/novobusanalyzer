@@ -139,6 +139,30 @@ namespace
         HINSTANCE m_hOldResource;
     };
 
+    CRect GetCompactDatabaseEditorRect(CWnd* pParentWnd)
+    {
+        constexpr int kDefaultWidth = 1220;
+        constexpr int kDefaultHeight = 820;
+        constexpr int kMinWidth = 900;
+        constexpr int kMinHeight = 650;
+        constexpr int kMargin = 40;
+
+        CRect rcEditor(20, 20, 20 + kDefaultWidth, 20 + kDefaultHeight);
+        if (pParentWnd != nullptr && pParentWnd->GetSafeHwnd() != nullptr)
+        {
+            CRect rcParent;
+            pParentWnd->GetClientRect(&rcParent);
+            const int nParentWidth = max(0, rcParent.Width());
+            const int nParentHeight = max(0, rcParent.Height());
+            const int nWidth = min(kDefaultWidth, max(kMinWidth, nParentWidth - kMargin));
+            const int nHeight = min(kDefaultHeight, max(kMinHeight, nParentHeight - kMargin));
+            const int nLeft = max(0, (nParentWidth - nWidth) / 2);
+            const int nTop = max(0, (nParentHeight - nHeight) / 2);
+            rcEditor.SetRect(nLeft, nTop, nLeft + nWidth, nTop + nHeight);
+        }
+        return rcEditor;
+    }
+
     CString GetModuleDirectory()
     {
         TCHAR szPath[MAX_PATH] = {};
@@ -1126,7 +1150,8 @@ void CMainFrame::OnOpenDatabase()
                                                 _("Database Editor"),
                                                 WS_CHILD | WS_VISIBLE |
                                                 WS_OVERLAPPED | WS_CAPTION |
-                                                WS_THICKFRAME, rectDefault,
+                                                WS_THICKFRAME,
+                                                GetCompactDatabaseEditorRect(this),
                                                 this ) ) {
                         MessageBox( _("Create BUSMASTER Database Window Failed!"),
                                     nullptr, MB_OK|MB_ICONERROR );
@@ -1448,13 +1473,13 @@ bool CMainFrame::bAssociateCanDatabaseFromDbc(CString omDbPath,
     }
 
     if (HasCommittedImportedCanDatabasePath(omDbPath)) {
-        if (bShowUserMessages) {
-            AfxMessageBox(_("This CAN DBC is already associated globally. Select a different DBC to add another file."),
-                          MB_OK | MB_ICONINFORMATION);
-        }
         TRACE1("CAN DBC associate skipped because the path is already committed: %s\n",
                omDbPath.GetString());
-        return false;
+        if (bShowUserMessages) {
+            AfxMessageBox(_("This CAN DBC is already associated. Re-selecting it will not create a duplicate entry."),
+                          MB_OK | MB_ICONINFORMATION);
+        }
+        return true;
     }
 
     ResetPreviewImportedCanDatabaseObject();
@@ -1509,7 +1534,7 @@ bool CMainFrame::bAssociateCanDatabaseFromDbc(CString omDbPath,
         if (!m_podMsgSgWnd->Create(nullptr,
                                    _("Database Editor"),
                                    WS_CHILD | WS_VISIBLE | WS_OVERLAPPED | WS_CAPTION | WS_THICKFRAME,
-                                   rectDefault,
+                                   GetCompactDatabaseEditorRect(this),
                                    this)) {
             if (bShowUserMessages) {
                 MessageBox(_("Create BUSMASTER Database Window Failed!"), nullptr, MB_OK | MB_ICONERROR);
@@ -1958,7 +1983,7 @@ void CMainFrame::OnNewDatabase()
                                          _("Database Editor"),
                                          WS_CHILD|WS_VISIBLE |WS_OVERLAPPED|
                                          WS_CAPTION|WS_THICKFRAME,
-                                         rectDefault, this ) ) {
+                                         GetCompactDatabaseEditorRect(this), this ) ) {
                 MessageBox( _("Create BUSMASTER Database Window Failed!"),
                             nullptr, MB_OK|MB_ICONERROR );
                 return;

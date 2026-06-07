@@ -183,6 +183,12 @@ BOOL CMsgSignalDBWnd::OnCreateClient(LPCREATESTRUCT /*lpcs*/,
 
     vCreateFooterButtons();
     m_bLayoutReady = false;
+    if (GetSafeHwnd() != nullptr)
+    {
+        CRect rcClient;
+        GetClientRect(&rcClient);
+        vLayoutSplitterColumns(rcClient.right);
+    }
     PostMessage(WM_APP + 104, 0, 0);
 
     CString omTitle = _("DatabaseEditor - ");
@@ -219,7 +225,7 @@ void CMsgSignalDBWnd::vCalculateSplitterPosition(CSize& cSize)
     // Calculate splitter position
     const int nClientWidth = max(0, sRect.right - sRect.left);
     const int nClientHeight = max(0, sRect.bottom - sRect.top);
-    cSize.cx = max(320, nClientWidth / 3);
+    cSize.cx = max(320, (nClientWidth * 39) / 100);
     cSize.cy = max(240, nClientHeight - 56);
 
 }
@@ -456,6 +462,7 @@ void CMsgSignalDBWnd::vLayoutFooterButtons(int cx, int cy)
     if (m_omSplitterWnd.GetSafeHwnd() != nullptr)
     {
         m_omSplitterWnd.MoveWindow(0, 0, rcClient.right, nSplitterHeight, TRUE);
+        vLayoutSplitterColumns(rcClient.right);
     }
 
     int y = max(0, nSplitterHeight + nBottom);
@@ -472,6 +479,21 @@ void CMsgSignalDBWnd::vLayoutFooterButtons(int cx, int cy)
     }
 
     m_bLayoutReady = true;
+}
+
+void CMsgSignalDBWnd::vLayoutSplitterColumns(int cx)
+{
+    if (m_omSplitterWnd.GetSafeHwnd() == nullptr)
+    {
+        return;
+    }
+
+    const int nClientWidth = max(0, cx);
+    const int nTreeWidth = max(320, (nClientWidth * 39) / 100);
+    const int nDetailWidth = max(320, nClientWidth - nTreeWidth);
+    m_omSplitterWnd.SetColumnInfo(FIRST_COL, nTreeWidth, 0);
+    m_omSplitterWnd.SetColumnInfo(SECOND_COL, nDetailWidth, 0);
+    m_omSplitterWnd.RecalcLayout();
 }
 
 void CMsgSignalDBWnd::OnAcceptAssociation()

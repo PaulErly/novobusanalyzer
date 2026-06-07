@@ -73,6 +73,7 @@ protected:
     DECLARE_MESSAGE_MAP()
 private:
     void vCreateFooterButtons();
+    void vLayoutSplitterColumns(int cx);
     void vLayoutFooterButtons(int cx, int cy);
     void vUpdateEditorLayout();
     void vDiscardImportedAssociation();
