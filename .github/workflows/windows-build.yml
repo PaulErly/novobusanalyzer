@@ -175,8 +175,13 @@ jobs:
           $sampleDbc = Join-Path $env:GITHUB_WORKSPACE 'Tests\Samples\CAN\dbc_smoke.dbc'
           $installerOut = Join-Path $installerDir 'NovoBusAnalyzer_Setup.exe'
           $nsisScript = Join-Path $env:GITHUB_WORKSPACE 'packaging\ci_novobusanalyzer_installer.nsi'
+          $nsisExe = Join-Path ${env:ProgramFiles(x86)} 'NSIS\makensis.exe'
 
-          & $((Get-Command makensis.exe).Source) `
+          if (-not (Test-Path $nsisExe)) {
+            throw "makensis.exe was not found at $nsisExe"
+          }
+
+          & $nsisExe `
             "/DRELEASE_DIR=$releaseDir" `
             "/DSAMPLE_DBC=$sampleDbc" `
             "/DOUTFILE=$installerOut" `
