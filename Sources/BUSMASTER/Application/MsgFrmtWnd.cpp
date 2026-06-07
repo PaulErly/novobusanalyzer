@@ -180,6 +180,8 @@ CMsgFrmtWnd::CMsgFrmtWnd(ETYPE_BUS eBusType, CMsgContainerBase* msgContainer, HW
     m_anMsgBuffSize[defDISPLAY_UPDATE_DATA_INDEX] = defDEF_DISPLAY_UPDATE_TIME;
 
     m_nPrevToolCol = m_nPrevToolRow = -1;
+    m_nScrollAnchorTopIndex = -1;
+    m_bManualScrollInspect = false;
 
 
 }
@@ -347,7 +349,6 @@ int CMsgFrmtWnd::OnCreate(LPCREATESTRUCT lpCreateStruct)
         }
         pWndChild = pWndChild->GetWindow(GW_HWNDNEXT);
     }
-
     //createToolBar();
 
     return 0;
@@ -641,10 +642,14 @@ LRESULT CMsgFrmtWnd::vOnExpandCollapseMsg(WPARAM wParam, LPARAM lParam)
 *******************************************************************************/
 LRESULT CMsgFrmtWnd::vOnSetFocusMsgList(WPARAM wParam, LPARAM /*lParam*/)
 {
-    bool bSetFocus = wParam!=0 ? true:false;
-    if(bSetFocus)
+    if (wParam != 0)
     {
-        m_lstMsg.SetFocus();
+        m_nScrollAnchorTopIndex = (int)wParam;
+        m_bManualScrollInspect = true;
+        if (m_lstMsg.GetSafeHwnd() != nullptr)
+        {
+            m_lstMsg.SetFocus();
+        }
     }
     return 0;
 }
@@ -1172,6 +1177,8 @@ void CMsgFrmtWnd::OnTimer(UINT_PTR nIDEvent)
     {
         if (m_bUpdate == TRUE)
         {
+            const int nTopBefore = (m_lstMsg.GetSafeHwnd() != nullptr) ? m_lstMsg.GetTopIndex() : -1;
+            const int nSelBefore = (m_lstMsg.GetSafeHwnd() != nullptr) ? m_lstMsg.GetSelectionMark() : -1;
             //Get count of list control
             int nBuffMsgCnt = 0;
             //Now for upadating no. of items in list ctrl
@@ -1186,7 +1193,10 @@ void CMsgFrmtWnd::OnTimer(UINT_PTR nIDEvent)
                 //item count in VFSE buffer
                 nBuffMsgCnt = m_omMgsIndexVec.size();
             }
-            m_lstMsg.SetItemCountEx(nBuffMsgCnt);
+            if (m_lstMsg.GetSafeHwnd() != nullptr && m_lstMsg.GetItemCount() != nBuffMsgCnt)
+            {
+                m_lstMsg.SetItemCountEx(nBuffMsgCnt);
+            }
             //vDoInterpretation();
             m_lstMsg.Invalidate(FALSE);
             m_bUpdate = FALSE;
@@ -1237,6 +1247,36 @@ void CMsgFrmtWnd::OnTimer(UINT_PTR nIDEvent)
                 vUpdateAllTreeWnd();
             }
             LeaveCriticalSection(&m_CritSec1);
+
+            if (m_lstMsg.GetSafeHwnd() != nullptr && m_bManualScrollInspect && nTopBefore >= 0)
+            {
+                const int nTopAfter = m_lstMsg.GetTopIndex();
+                if (nTopAfter != nTopBefore)
+                {
+                    CRect rcItem;
+                    int nRowHeight = 0;
+                    if (m_lstMsg.GetItemRect(max(0, nTopAfter), &rcItem, LVIR_BOUNDS))
+                    {
+                        nRowHeight = max(1, rcItem.Height());
+                    }
+                    else if (m_lstMsg.GetItemRect(max(0, nTopBefore), &rcItem, LVIR_BOUNDS))
+                    {
+                        nRowHeight = max(1, rcItem.Height());
+                    }
+                    if (nRowHeight > 0)
+                    {
+                        const int nDeltaRows = nTopBefore - nTopAfter;
+                        if (nDeltaRows != 0)
+                        {
+                            m_lstMsg.Scroll(CSize(0, nDeltaRows * nRowHeight));
+                        }
+                    }
+                }
+            }
+            if (!m_bManualScrollInspect && nSelBefore >= 0 && m_lstMsg.GetSafeHwnd() != nullptr)
+            {
+                m_lstMsg.SetSelectionMark(nSelBefore);
+            }
         }
     }
     CMDIChildWnd::OnTimer(nIDEvent);
@@ -2846,6 +2886,8 @@ void CMsgFrmtWnd::vArrangeAllTreeWnd()
 *******************************************************************************/
 void CMsgFrmtWnd::vUpdateAllTreeWnd()
 {
+    const int nTopBefore = m_lstMsg.GetSafeHwnd() != nullptr ? m_lstMsg.GetTopIndex() : -1;
+    const int nSelBefore = m_lstMsg.GetSafeHwnd() != nullptr ? m_lstMsg.GetSelectionMark() : -1;
     // Variable to keep entry details
     SMSGDISPMAPENTRY sTemp;
     // Variable to hold message ID
@@ -2886,6 +2928,42 @@ void CMsgFrmtWnd::vUpdateAllTreeWnd()
             }
         }
     }
+    if (m_lstMsg.GetSafeHwnd() != nullptr)
+    {
+        const int nTopAfter = m_lstMsg.GetTopIndex();
+        if (m_bManualScrollInspect && nTopBefore >= 0 && nTopAfter != nTopBefore)
+        {
+            CRect rcItem;
+            int nRowHeight = 0;
+            if (m_lstMsg.GetItemRect(max(0, nTopAfter), &rcItem, LVIR_BOUNDS))
+            {
+                nRowHeight = max(1, rcItem.Height());
+            }
+            else if (m_lstMsg.GetItemRect(max(0, nTopBefore), &rcItem, LVIR_BOUNDS))
+            {
+                nRowHeight = max(1, rcItem.Height());
+            }
+
+            if (nRowHeight > 0)
+            {
+                const int nDeltaRows = nTopBefore - nTopAfter;
+                if (nDeltaRows != 0)
+                {
+                    m_lstMsg.Scroll(CSize(0, nDeltaRows * nRowHeight));
+                }
+            }
+        }
+        else if (!m_bManualScrollInspect && nTopBefore >= 0)
+        {
+            m_lstMsg.EnsureVisible(nTopBefore, FALSE);
+        }
+
+        if (!m_bManualScrollInspect && nSelBefore >= 0)
+        {
+            m_lstMsg.SetSelectionMark(nSelBefore);
+        }
+        m_nScrollAnchorTopIndex = m_lstMsg.GetTopIndex();
+    }
 }
 
 /*******************************************************************************
@@ -2900,6 +2978,8 @@ void CMsgFrmtWnd::vUpdateAllTreeWnd()
 *******************************************************************************/
 void CMsgFrmtWnd::vUpdateMsgTreeWnd(__int64 nMapIndex)
 {
+    const int nTopBefore = m_lstMsg.GetSafeHwnd() != nullptr ? m_lstMsg.GetTopIndex() : -1;
+    const int nSelBefore = m_lstMsg.GetSafeHwnd() != nullptr ? m_lstMsg.GetSelectionMark() : -1;
     // Variable to keep entry details
     SMSGDISPMAPENTRY sTemp;
     if (m_omMsgDispMap.Lookup(nMapIndex, sTemp))
@@ -2926,6 +3006,42 @@ void CMsgFrmtWnd::vUpdateMsgTreeWnd(__int64 nMapIndex)
 
             sTemp.m_opTreeWndParam->vUpdateTreeValues(omSigStrArray, rgbTreeItem);
         }
+    }
+    if (m_lstMsg.GetSafeHwnd() != nullptr)
+    {
+        const int nTopAfter = m_lstMsg.GetTopIndex();
+        if (m_bManualScrollInspect && nTopBefore >= 0 && nTopAfter != nTopBefore)
+        {
+            CRect rcItem;
+            int nRowHeight = 0;
+            if (m_lstMsg.GetItemRect(max(0, nTopAfter), &rcItem, LVIR_BOUNDS))
+            {
+                nRowHeight = max(1, rcItem.Height());
+            }
+            else if (m_lstMsg.GetItemRect(max(0, nTopBefore), &rcItem, LVIR_BOUNDS))
+            {
+                nRowHeight = max(1, rcItem.Height());
+            }
+
+            if (nRowHeight > 0)
+            {
+                const int nDeltaRows = nTopBefore - nTopAfter;
+                if (nDeltaRows != 0)
+                {
+                    m_lstMsg.Scroll(CSize(0, nDeltaRows * nRowHeight));
+                }
+            }
+        }
+        else if (!m_bManualScrollInspect && nTopBefore >= 0)
+        {
+            m_lstMsg.EnsureVisible(nTopBefore, FALSE);
+        }
+
+        if (!m_bManualScrollInspect && nSelBefore >= 0)
+        {
+            m_lstMsg.SetSelectionMark(nSelBefore);
+        }
+        m_nScrollAnchorTopIndex = m_lstMsg.GetTopIndex();
     }
 }
 
@@ -3966,6 +4082,20 @@ void CMsgFrmtWnd::vSetClientID(DWORD dwClientID)
 
 BOOL CMsgFrmtWnd::PreTranslateMessage(MSG* pMsg)
 {
+    if (pMsg != nullptr &&
+        pMsg->message == WM_MOUSEWHEEL &&
+        pMsg->hwnd != nullptr &&
+        ::IsChild(m_hWnd, pMsg->hwnd) &&
+        pMsg->hwnd != m_lstMsg.GetSafeHwnd())
+    {
+        char cls[256] = {0};
+        ::GetClassNameA(pMsg->hwnd, cls, 255);
+        if (strcmp(cls, "SysTreeView32") == 0 && m_lstMsg.GetSafeHwnd() != nullptr)
+        {
+            m_lstMsg.SendMessage(WM_MOUSEWHEEL, pMsg->wParam, pMsg->lParam);
+            return TRUE;
+        }
+    }
     // TODO: Add your specialized code here and/or call the base class
     if ( pMsg->message >= WM_MOUSEFIRST &&
             pMsg->message <= WM_MOUSELAST )

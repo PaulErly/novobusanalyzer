@@ -160,6 +160,8 @@ private:
     int m_nPrevToolCol;
     int m_nPrevToolRow;
     CRect m_omDefaultRect;
+    int m_nScrollAnchorTopIndex;
+    bool m_bManualScrollInspect;
 
 
 
