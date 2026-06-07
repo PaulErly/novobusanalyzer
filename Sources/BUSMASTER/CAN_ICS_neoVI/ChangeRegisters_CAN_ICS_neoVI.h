@@ -30,6 +30,7 @@
 //#include "Include/Struct_Can.h"
 #include "ChangeRegDefines.h"
 #include "CAN_ICS_neoVI_Resource.h"
+#include "NeoVIDeviceDiscovery.h"
 #include "DIL_Interface\IChangeRegisters.h"
 #define defICSneoVIFrequency (32 * 1000000)
 #define defPropDelayICSneoVI 1
@@ -135,6 +136,8 @@ protected:
     CString m_omStrEditWarningLimit;
     CString m_omStrPropDelay;
     CString m_omStrSJW;
+    CString m_omStrNeoVILocation;
+    CString m_omStrNeoVIDevice;
     //}}AFX_DATA
     DOUBLE  m_dEditBaudRate;
     UINT    m_unCombClock;
@@ -165,6 +168,7 @@ private:
     afx_msg void OnClickListChannels(NMHDR* pNMHDR, LRESULT* pResult);
     afx_msg void OnItemchangedListChannels(NMHDR* pNMHDR, LRESULT* pResult);
     afx_msg void OnDblclkListChannels(NMHDR* pNMHDR, LRESULT* pResult);
+    afx_msg void OnBnClickedNeoVIDiscover();
     //}}AFX_MSG
     DECLARE_MESSAGE_MAP()
 private:

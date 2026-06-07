@@ -75,6 +75,95 @@ Supported x64 CAN database flow:
 - File dialog multi-select is unrelated to the global association model. Each
   `.dbc` is still associated globally on CAN channel 0.
 
+## Intrepid neoVI Ethernet CAN support
+
+The existing `IntrepidCS neoVI` / `CAN_ICS_neoVI` driver path is being
+modernized in place for Ethernet-connected neoVI devices and classic CAN.
+The first pass keeps the driver optional at runtime so the app and CI still
+build cleanly without Intrepid hardware or SDK files on the machine.
+
+Current user workflow:
+1. Install the Intrepid neoVI runtime on the PC.
+2. Connect the neoVI hardware to Ethernet.
+3. Open NovoBusAnalyzer.
+4. Go to the CAN tab, then `Driver Selection`, choose `IntrepidCS neoVI`,
+   open `Channel Configuration` / `Configure`, and click `Discover...`.
+5. Use `Discover...` to scan for
+   local USB-attached devices, discover remote Ethernet devices, or enter a
+   manual IP address as a fallback.
+6. Save the selected device/IP if desired, then go online and monitor CAN
+   traffic.
+
+What must be installed:
+- the Intrepid neoVI runtime DLLs, including `icsneo40.dll`
+- the device driver/runtime package from Intrepid
+- a separate SDK install is not required just to run the app if
+  `icsneo40.dll` is already available on the machine
+
+What is needed for building:
+- the repo already carries the legacy header/source shim it uses for neoVI
+- if you want the build to probe a custom SDK/runtime root, set
+  `INTREPID_SDK_DIR` or `NEOVI_SDK_DIR`
+- the build still succeeds without the proprietary SDK/runtime present; the
+  neoVI target is simply disabled at runtime
+
+Where `icsneo40.dll` must be located:
+- the driver loader searches beside the application binary first
+- it also checks common subfolders under the app directory
+- it then checks the system directory and any `INTREPID_SDK_DIR` /
+  `NEOVI_SDK_DIR` path you provide
+
+How to set the neoVI IP address:
+- the preferred path is the in-app `Discover...` dialog in the neoVI
+  configuration screen
+- it can discover remote Ethernet devices or accept a manual IP address as a
+  fallback
+- the driver still honors `INTREPID_NEOVI_IP_ADDRESS` or `NEOVI_IP_ADDRESS`
+  for advanced/manual bring-up, but that is now a fallback path rather than the
+  primary workflow
+
+If the SDK/runtime cannot be found, the neoVI entry stays visible but is
+disabled and selecting it shows:
+`neoVI driver disabled: Intrepid SDK/runtime not found`
+
+How to verify the driver is enabled:
+- select `IntrepidCS neoVI` in the CAN hardware menu
+- if the runtime is present, the selection proceeds into the existing neoVI
+  hardware list/open flow
+- if the runtime is missing, the menu entry remains visible but is disabled
+  and the above error is shown
+
+The app currently uses the existing `CAN_ICS_neoVI` / `IntrepidCS neoVI`
+integration path. It does not hide the driver when the runtime is unavailable.
+Selected device/IP details are saved with the controller configuration and are
+restored on the next open.
+
+This first implementation is intentionally limited to classic CAN and Ethernet
+device bring-up. USB, CAN FD, Vehicle Spy import, XCP, and other advanced
+neoVI features remain future work.
+
+Hardware validation is pending until the real device is available again. The
+manual checklist below is the path to follow once the hardware is in hand:
+
+1. Configure CMake with `ENABLE_NEOVI_DRIVER=ON` and the SDK/runtime path if
+   needed.
+2. Confirm the `CAN_ICS_neoVI` target builds and the runtime DLLs are deployed
+   beside the app.
+3. Select `IntrepidCS neoVI` in the CAN hardware menu.
+4. Connect the neoVI device over Ethernet and confirm the device opens.
+5. Verify the reported channel count matches the hardware or the configured
+   channel count.
+6. Receive a classic CAN frame on channel 1 and any additional channels
+   exposed by the hardware.
+7. Transmit a simple CAN frame on the selected channel.
+8. Associate a DBC and confirm decoded frames appear in the message window.
+9. Unplug Ethernet and confirm the app reports the disconnect cleanly.
+10. Reconnect if supported and verify the device can be opened again.
+
+Follow-up item:
+- add an in-app neoVI Ethernet configuration dialog so the IP address does not
+  need to come from an environment variable.
+
 The deploy step also copies `BUSMASTER.chm` from `Sources/BUSMASTER/BIN/Release`
 into the runtime folder so the Help menu and the Test Automation Editor help
 link can resolve locally.

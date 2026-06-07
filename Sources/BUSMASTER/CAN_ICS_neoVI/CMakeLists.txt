@@ -6,6 +6,7 @@ set(sources
   CAN_ICS_neoVI_Network.cpp
   CAN_ICS_neoVI_stdafx.cpp
   CANRegAnalysis_CAN_ICS_neoVI.cpp
+  NeoVIDeviceDiscoveryDlg.cpp
   ChangeRegisters_CAN_ICS_neoVI.cpp
   ../Application/MultiLanguage.cpp
   ../DIL_Interface/HardwareListingCAN.cpp
@@ -19,6 +20,7 @@ set(headers
   CAN_ICS_neoVI_Resource.h
   CAN_ICS_neoVI_stdafx.h
   ChangeRegDefines.h
+  NeoVIDeviceDiscovery.h
   ChangeRegisters_CAN_ICS_neoVI.h
   ContrConfigPeakUsbDefs.h
   ../Application/MultiLanguage.h)
@@ -37,6 +39,9 @@ include_directories(
 
 # compiler options
 add_definitions(-D_USRDLL)
+if(DEFINED NEOVI_SDK_DIR AND NOT NEOVI_SDK_DIR STREQUAL "")
+  target_compile_definitions(${PROJECT_NAME} PRIVATE NEOVI_SDK_DIR="${NEOVI_SDK_DIR}")
+endif()
 
 # linker options
 set_target_properties(${PROJECT_NAME} PROPERTIES LINK_FLAGS "/NODEFAULTLIB:daouuid")

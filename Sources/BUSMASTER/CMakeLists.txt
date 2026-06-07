@@ -100,6 +100,25 @@ option(BUILD_LDFEDITOR "Build the Qt-based LDF Editor helper" OFF)
 if(NOT CMAKE_SIZEOF_VOID_P EQUAL 8)
   set(BUILD_LDFEDITOR ON)
 endif()
+
+option(ENABLE_NEOVI_DRIVER "Build Intrepid neoVI driver support" ON)
+set(NEOVI_SDK_DIR "" CACHE PATH "Path to the Intrepid neoVI SDK/runtime root")
+if(ENABLE_NEOVI_DRIVER)
+  if(NEOVI_SDK_DIR STREQUAL "")
+    if(DEFINED ENV{INTREPID_SDK_DIR} AND NOT "$ENV{INTREPID_SDK_DIR}" STREQUAL "")
+      set(NEOVI_SDK_DIR "$ENV{INTREPID_SDK_DIR}")
+    elseif(DEFINED ENV{NEOVI_SDK_DIR} AND NOT "$ENV{NEOVI_SDK_DIR}" STREQUAL "")
+      set(NEOVI_SDK_DIR "$ENV{NEOVI_SDK_DIR}")
+    endif()
+  endif()
+
+  if(NEOVI_SDK_DIR AND EXISTS "${NEOVI_SDK_DIR}")
+    message(STATUS "neoVI driver SDK/runtime path: ${NEOVI_SDK_DIR}")
+  else()
+    message(STATUS "neoVI driver disabled: SDK not found")
+    set(NEOVI_SDK_DIR "")
+  endif()
+endif()
 ################################################################################
 # Global include directories
 ################################################################################

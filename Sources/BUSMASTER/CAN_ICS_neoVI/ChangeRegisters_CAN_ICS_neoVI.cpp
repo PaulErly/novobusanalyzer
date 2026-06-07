@@ -26,6 +26,7 @@
 #include "ContrConfigPeakUsbDefs.h"
 #include "CAN_ICS_neoVI_Resource.h"
 #include "ChangeRegisters_CAN_ICS_neoVI.h"
+#include "NeoVIDeviceDiscovery.h"
 #include "Utility\MultiLanguageSupport.h"
 //#include "../Application/GettextBusmaster.h"
 #ifdef _DEBUG
@@ -59,6 +60,8 @@ CChangeRegisters_CAN_ICS_neoVI::CChangeRegisters_CAN_ICS_neoVI(CWnd* pParent /*=
     m_omStrcombBaudRate = "";
     m_omStrComboClock = "32";
     m_omStrEditWarningLimit = "";
+    m_omStrNeoVILocation = "";
+    m_omStrNeoVIDevice = "";
 	m_nLastSelection = 0;
 	m_omChannelImageList.Create(defCHANNEL_ICON_SIZE,
 		defCHANNEL_ICON_SIZE,
@@ -134,6 +137,7 @@ BEGIN_MESSAGE_MAP(CChangeRegisters_CAN_ICS_neoVI, CDialog)
     ON_NOTIFY(HDN_ITEMCLICK, 0, OnHdnItemclickLstcBtrList)
     ON_CBN_SELCHANGE(IDC_COMB_SJW, OnCbnSelchangeCombSjw)
     ON_CBN_SELCHANGE(IDC_COMB_PROPDELAY, OnCbnSelchangeCombPropdelay)
+    ON_BN_CLICKED(IDC_BUTTON_NEOVI_DISCOVER, OnBnClickedNeoVIDiscover)
     //}}AFX_MSG_MAP
 END_MESSAGE_MAP()
 
@@ -325,6 +329,17 @@ BOOL CChangeRegisters_CAN_ICS_neoVI::OnInitDialog()
     if (pWndFilter != nullptr)
     {
         pWndFilter->EnableWindow(FALSE);
+    }
+    if (m_pControllerDetails != nullptr)
+    {
+        m_omStrNeoVILocation = m_pControllerDetails[m_nLastSelection].m_omStrLocation.c_str();
+        m_omStrNeoVIDevice = m_pControllerDetails[m_nLastSelection].m_omHardwareDesc.c_str();
+        CWnd* pWndDesc = GetDlgItem(IDC_EDIT_CHANNEL_DESC);
+        if (pWndDesc != nullptr)
+        {
+            pWndDesc->SetWindowText(m_omStrNeoVIDevice);
+        }
+        UpdateData(FALSE);
     }
     //Initialise the index for number of items in list box before passing it is
     //function to calculate the same.
@@ -1031,6 +1046,44 @@ void CChangeRegisters_CAN_ICS_neoVI::OnDblclkListChannels(NMHDR* /*pNMHDR*/, LRE
 }
 
 /*******************************************************************************
+  Function Name  : OnBnClickedNeoVIDiscover
+  Functionality   : Launch neoVI discovery dialog and store the selected IP/
+                    device description back into the current controller entry.
+*******************************************************************************/
+void CChangeRegisters_CAN_ICS_neoVI::OnBnClickedNeoVIDiscover()
+{
+    UpdateData(TRUE);
+
+    CNeoVIDeviceDiscoveryDlg omDlg(this, m_omStrNeoVILocation);
+    if (omDlg.DoModal() == IDOK)
+    {
+        if (omDlg.IsManualIpSelection())
+        {
+            m_omStrNeoVILocation = omDlg.GetManualIp();
+            m_omStrNeoVIDevice.Format(_T("Manual IP fallback: %s"), m_omStrNeoVILocation.GetString());
+        }
+        else if (omDlg.HasSelection())
+        {
+            const SNeoVIDeviceDiscoveryInfo& sDevice = omDlg.GetSelectedDevice();
+            m_omStrNeoVILocation = sDevice.m_omIpAddress;
+            m_omStrNeoVIDevice.Format(_T("%s, SN %s, %s, %u channels"),
+                                      sDevice.m_omModel.GetString(),
+                                      sDevice.m_omSerial.GetString(),
+                                      sDevice.m_omIpAddress.IsEmpty() ? _T("Local") : sDevice.m_omIpAddress.GetString(),
+                                      sDevice.m_unChannelCount);
+        }
+
+        CWnd* pWndDesc = GetDlgItem(IDC_EDIT_CHANNEL_DESC);
+        if (pWndDesc != nullptr)
+        {
+            pWndDesc->SetWindowText(m_omStrNeoVIDevice);
+        }
+        UpdateData(FALSE);
+        vUpdateControllerDetails();
+    }
+}
+
+/*******************************************************************************
   Function Name  : vFillControllerConfigDetails
   Input(s)       : -
   Output         : -
@@ -1062,6 +1115,9 @@ void CChangeRegisters_CAN_ICS_neoVI::vFillControllerConfigDetails()
     m_omStrEditWarningLimit = m_pControllerDetails[ nIndex ].m_omStrWarningLimit.c_str();
     m_omStrPropDelay = m_pControllerDetails[ nIndex ].m_omStrPropagationDelay.c_str();
     m_omStrSJW = m_pControllerDetails[ nIndex ].m_omStrSjw.c_str();
+    m_omStrNeoVILocation = m_pControllerDetails[ nIndex ].m_omStrLocation.c_str();
+    m_omStrNeoVIDevice = m_pControllerDetails[ nIndex ].m_omHardwareDesc.c_str();
+    UpdateData(FALSE);
 
 
     int nSample             = _tstoi(m_omStrComboSampling);
@@ -1155,6 +1211,8 @@ void CChangeRegisters_CAN_ICS_neoVI::vUpdateControllerDetails()
         m_pControllerDetails[ m_nLastSelection ].m_omStrWarningLimit = m_omStrEditWarningLimit.GetBuffer(MAX_PATH);
         m_pControllerDetails[ m_nLastSelection ].m_omStrPropagationDelay = m_omStrPropDelay.GetBuffer(MAX_PATH);
         m_pControllerDetails[ m_nLastSelection ].m_omStrSjw = m_omStrSJW.GetBuffer(MAX_PATH);
+        m_pControllerDetails[ m_nLastSelection ].m_omStrLocation = m_omStrNeoVILocation.GetBuffer(MAX_PATH);
+        m_pControllerDetails[ m_nLastSelection ].m_omHardwareDesc = m_omStrNeoVIDevice.GetBuffer(MAX_PATH);
     }
     else
     {

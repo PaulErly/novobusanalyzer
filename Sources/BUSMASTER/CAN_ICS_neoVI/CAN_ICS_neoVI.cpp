@@ -33,6 +33,7 @@
 //#include "Include/Struct_CAN.h"
 #include "CAN_ICS_neoVI_Channel.h"
 #include "CAN_ICS_neoVI_Network.h"
+#include "NeoVIDeviceDiscovery.h"
 #include "Utility/Utility_Thread.h"
 //#include "Include/DIL_CommonDefs.h"
 #include "EXTERNAL/icsnVC40.h"
@@ -202,6 +203,7 @@ static INTERFACE_HW sg_HardwareIntr[defNO_OF_CHANNELS];
 static CNetwork sg_odHardwareNetwork;
 
 static NeoDevice sg_ndNeoToOpen [CHANNEL_CAN_MAX];
+static char sg_szNeoViRuntimeError[MAX_PATH] = {0};
 
 // Create time struct. Use 0 to transmit the message with out any delay
 typedef struct
@@ -216,6 +218,125 @@ static TCANTimestamp sg_sTime;
 
 const int SIZE_WORD     = sizeof(WORD);
 const int SIZE_CHAR     = sizeof(char);
+extern std::string sg_acErrStr;
+
+static void vSetNeoViError(const char* pcText)
+{
+    sg_acErrStr = (pcText != nullptr) ? pcText : "";
+    if (pcText != nullptr)
+    {
+        strncpy_s(sg_szNeoViRuntimeError, pcText, _TRUNCATE);
+    }
+    else
+    {
+        sg_szNeoViRuntimeError[0] = '\0';
+    }
+}
+
+static CString sGetModuleDirectory()
+{
+    TCHAR szPath[MAX_PATH] = {};
+    if (GetModuleFileName(theApp.m_hInstance, szPath, MAX_PATH) == 0)
+    {
+        return CString();
+    }
+
+    PathRemoveFileSpec(szPath);
+    return CString(szPath);
+}
+
+static bool bFileExists(const CString& path)
+{
+    if (path.IsEmpty())
+    {
+        return false;
+    }
+    return GetFileAttributes(path) != INVALID_FILE_ATTRIBUTES;
+}
+
+static void vAppendRuntimeCandidates(std::vector<CString>& paths, const CString& rootDir)
+{
+    if (rootDir.IsEmpty())
+    {
+        return;
+    }
+
+    paths.push_back(rootDir + _T("\\icsneo40.dll"));
+    paths.push_back(rootDir + _T("\\bin\\icsneo40.dll"));
+    paths.push_back(rootDir + _T("\\bin\\x64\\icsneo40.dll"));
+    paths.push_back(rootDir + _T("\\x64\\icsneo40.dll"));
+}
+
+static bool bLoadNeoViRuntimeDll(HINSTANCE& hAPIDLL, CString& outLoadedPath)
+{
+    hAPIDLL = nullptr;
+    outLoadedPath.Empty();
+
+    std::vector<CString> candidates;
+    const CString moduleDir = sGetModuleDirectory();
+    vAppendRuntimeCandidates(candidates, moduleDir);
+
+    TCHAR szSystemDir[MAX_PATH] = {};
+    if (GetSystemDirectory(szSystemDir, MAX_PATH) != 0)
+    {
+        vAppendRuntimeCandidates(candidates, CString(szSystemDir));
+    }
+
+#ifdef NEOVI_SDK_DIR
+    vAppendRuntimeCandidates(candidates, CString(NEOVI_SDK_DIR));
+#endif
+
+    const TCHAR* const envVars[] = { _T("INTREPID_SDK_DIR"), _T("NEOVI_SDK_DIR"), _T("INTREPID_NEOVI_DIR") };
+    for (const TCHAR* envVar : envVars)
+    {
+        TCHAR szValue[MAX_PATH] = {};
+        if (GetEnvironmentVariable(envVar, szValue, MAX_PATH) > 0)
+        {
+            vAppendRuntimeCandidates(candidates, CString(szValue));
+        }
+    }
+
+    for (const auto& candidate : candidates)
+    {
+        if (bFileExists(candidate))
+        {
+            hAPIDLL = LoadLibrary(candidate);
+            if (hAPIDLL != nullptr)
+            {
+                outLoadedPath = candidate;
+                return true;
+            }
+        }
+    }
+
+    return false;
+}
+
+static CString sGetNeoVIRemoteIPAddress()
+{
+    const TCHAR* const envVars[] = { _T("INTREPID_NEOVI_IP_ADDRESS"), _T("NEOVI_IP_ADDRESS") };
+    for (const TCHAR* envVar : envVars)
+    {
+        TCHAR szValue[MAX_PATH] = {};
+        if (GetEnvironmentVariable(envVar, szValue, MAX_PATH) > 0)
+        {
+            return CString(szValue);
+        }
+    }
+    return CString();
+}
+
+static CString sGetConfiguredNeoVIRemoteIPAddress()
+{
+    for (int i = 0; i < defNO_OF_CHANNELS; ++i)
+    {
+        if (!sg_ControllerDetails[i].m_omStrLocation.empty())
+        {
+            return CString(sg_ControllerDetails[i].m_omStrLocation.c_str());
+        }
+    }
+    return sGetNeoVIRemoteIPAddress();
+}
 
 // TZM specific Global variables
 #define CAN_MAX_ERRSTR 256
@@ -252,7 +373,7 @@ HRESULT hFillHardwareDesc(PSCONTROLLER_DETAILS pControllerDetails);
 #define WAITTIME_NEOVI          100
 #define NETWORKS_COUNT          51
 
-const int NEOVI_OK = 1;
+extern const int NEOVI_OK = 1;
 const long VALUECAN_ERROR_BITS = SPY_STATUS_GLOBAL_ERR | SPY_STATUS_CRC_ERROR |
                                  SPY_STATUS_INCOMPLETE_FRAME | SPY_STATUS_UNDEFINED_ERROR
                                  | SPY_STATUS_BAD_MESSAGE_BIT_TIME_ERROR;
@@ -291,6 +412,10 @@ typedef int  (__stdcall* FINDNEODEVICES)(unsigned long DeviceTypes, NeoDevice* p
 static FINDNEODEVICES icsneoFindNeoDevices;
 typedef int  (__stdcall* OPENNEODEVICE)(NeoDevice* pNeoDevice, int* hObject, unsigned char* bNetworkIDs, int bConfigRead, int bSyncToPC);
 static OPENNEODEVICE icsneoOpenNeoDevice;
+typedef int (__stdcall* OPENREMOTEDEVICE)(char* pIPAddress, NeoDevice* pNeoDevice, int* hObject, unsigned char* bNetworkIDs, int iOptions);
+static OPENREMOTEDEVICE icsneoOpenRemoteNeoDevice;
+typedef int (__stdcall* FINDREMOTEDEVICES)(char* pIPAddress, NeoDevice* pNeoDevice, int* pNumDevices);
+static FINDREMOTEDEVICES icsneoFindRemoteNeoDevices;
 typedef int  (__stdcall* CLOSEPORT)(int hObject, int* pNumberOfErrors);
 static CLOSEPORT icsneoClosePort;
 typedef void (__stdcall* FREEOBJECT)(int hObject);
@@ -1447,6 +1572,102 @@ std::string omGetDeviceType(int /*i*/, unsigned long ulDeviceType, unsigned int 
 
     return chTemp;
 }
+
+static CString sGetNeoVIModelName(unsigned long ulDeviceType)
+{
+    switch (ulDeviceType)
+    {
+        case NEODEVICE_BLUE:
+            return _T("neoVI Blue");
+        case NEODEVICE_FIRE:
+            return _T("neoVI Fire/Red");
+        case NEODEVICE_DW_VCAN:
+            return _T("ValueCAN");
+        case NEODEVICE_VCAN3:
+            return _T("ValueCAN 3");
+        default:
+            {
+                CString omStr;
+                omStr.Format(_T("DeviceType 0x%lx"), ulDeviceType);
+                return omStr;
+            }
+    }
+}
+
+static UINT sGetNeoVIChannelCount(unsigned long ulDeviceType, int nHardwareLic)
+{
+    switch (ulDeviceType)
+    {
+        case NEODEVICE_BLUE:
+        case NEODEVICE_FIRE:
+            return 4;
+        case NEODEVICE_DW_VCAN:
+            return 1;
+        case NEODEVICE_VCAN3:
+            return (nHardwareLic == 8) ? 1U : 2U;
+        default:
+            return 1;
+    }
+}
+
+int nDiscoverNeoVIDevices(std::vector<SNeoVIDeviceDiscoveryInfo>& aDevices, const CString& oRemoteIp, CString& oError)
+{
+    aDevices.clear();
+    oError.Empty();
+
+    if (sg_hDll == nullptr || icsneoFindNeoDevices == nullptr)
+    {
+        oError = _T("neoVI driver disabled: Intrepid SDK/runtime not found");
+        return -1;
+    }
+
+    NeoDevice localDevices[MAX_DEVICES] = {};
+    int nLocalCount = 0;
+    if (icsneoFindNeoDevices(NEODEVICE_ALL, localDevices, &nLocalCount) == NEOVI_OK)
+    {
+        for (int i = 0; i < nLocalCount && i < MAX_DEVICES; ++i)
+        {
+            SNeoVIDeviceDiscoveryInfo sInfo;
+            sInfo.m_ouDevice = localDevices[i];
+            sInfo.m_omTransport = _T("Local");
+            sInfo.m_omModel = sGetNeoVIModelName(localDevices[i].DeviceType);
+            sInfo.m_omSerial.Format(_T("%d"), localDevices[i].SerialNumber);
+            sInfo.m_unChannelCount = sGetNeoVIChannelCount(localDevices[i].DeviceType, 0);
+            sInfo.m_bRemote = FALSE;
+            aDevices.push_back(sInfo);
+        }
+    }
+
+    if (!oRemoteIp.IsEmpty() && icsneoFindRemoteNeoDevices != nullptr)
+    {
+        CStringA remoteIpA(oRemoteIp);
+        NeoDevice remoteDevices[MAX_DEVICES] = {};
+        int nRemoteCount = 0;
+        if (icsneoFindRemoteNeoDevices(const_cast<char*>(remoteIpA.GetString()), remoteDevices, &nRemoteCount) == NEOVI_OK)
+        {
+            for (int i = 0; i < nRemoteCount && i < MAX_DEVICES; ++i)
+            {
+                SNeoVIDeviceDiscoveryInfo sInfo;
+                sInfo.m_ouDevice = remoteDevices[i];
+                sInfo.m_omTransport = _T("Ethernet");
+                sInfo.m_omModel = sGetNeoVIModelName(remoteDevices[i].DeviceType);
+                sInfo.m_omSerial.Format(_T("%d"), remoteDevices[i].SerialNumber);
+                sInfo.m_omIpAddress = oRemoteIp;
+                sInfo.m_unChannelCount = sGetNeoVIChannelCount(remoteDevices[i].DeviceType, 0);
+                sInfo.m_bRemote = TRUE;
+                aDevices.push_back(sInfo);
+            }
+        }
+    }
+
+    if (aDevices.empty())
+    {
+        oError = _T("No neoVI devices discovered.");
+        return -1;
+    }
+
+    return NEOVI_OK;
+}
 /**
  * This function will add channels to hardware inteface structure.
  */
@@ -1767,14 +1988,31 @@ static int nGetNoOfConnectedHardware(int& nHardwareCount)
     // > 0, Number of devices found
     // < 0, query for devices unsucessful
     int nReturn = NO_HW_INTERFACE;
+    const CString oRemoteIp = sGetConfiguredNeoVIRemoteIPAddress();
 
     for (BYTE i = 0; i < 16; i++)
     {
         m_ucNetworkID[i] = i;
     }
     nHardwareCount = 32;
-    // TODO: Add your command handler code here
-    if ( icsneoFindNeoDevices(NEODEVICE_ALL , sg_ndNeoToOpen , &nHardwareCount ) )
+    if (!oRemoteIp.IsEmpty() && icsneoFindRemoteNeoDevices != nullptr)
+    {
+        CStringA remoteIpA(oRemoteIp);
+        if (icsneoFindRemoteNeoDevices(const_cast<char*>(remoteIpA.GetString()), sg_ndNeoToOpen, &nHardwareCount))
+        {
+            if (nHardwareCount == 0)
+            {
+                m_omErrStr = "Remote neoVI query successful, but no device found";
+            }
+            nReturn = nHardwareCount;
+        }
+        else
+        {
+            nHardwareCount = 0;
+            m_omErrStr = "Remote neoVI query failed";
+        }
+    }
+    else if ( icsneoFindNeoDevices(NEODEVICE_ALL , sg_ndNeoToOpen , &nHardwareCount ) )
     {
         if (nHardwareCount == 0)
         {
@@ -2048,7 +2286,19 @@ static int nConnect(BOOL bConnect, BYTE /*hClient*/)
             }
             else
             {
-                nReturn = (*icsneoOpenNeoDevice)(&sg_ndNeoToOpen[i], &(m_anhObject[i][0]), m_ucNetworkID, 1, 0);
+                const CString oRemoteIp = !sg_ControllerDetails[i].m_omStrLocation.empty()
+                                          ? CString(sg_ControllerDetails[i].m_omStrLocation.c_str())
+                                          : sGetConfiguredNeoVIRemoteIPAddress();
+                const bool bRemoteMode = !oRemoteIp.IsEmpty() && (icsneoOpenRemoteNeoDevice != nullptr);
+                CStringA remoteIpA(oRemoteIp);
+                if (bRemoteMode)
+                {
+                    nReturn = (*icsneoOpenRemoteNeoDevice)(const_cast<char*>(remoteIpA.GetString()), &sg_ndNeoToOpen[i], &(m_anhObject[i][0]), m_ucNetworkID, 0);
+                }
+                else
+                {
+                    nReturn = (*icsneoOpenNeoDevice)(&sg_ndNeoToOpen[i], &(m_anhObject[i][0]), m_ucNetworkID, 1, 0);
+                }
             }
 
             if (nReturn != NEOVI_OK)
@@ -2057,7 +2307,19 @@ static int nConnect(BOOL bConnect, BYTE /*hClient*/)
                 nDisconnectFromDriver(); // operations from the driver
 
                 // Try again
-                (*icsneoOpenNeoDevice)(&sg_ndNeoToOpen[i], &(m_anhObject[i][0]), m_ucNetworkID, 1, 0);
+                const CString oRemoteIpRetry = !sg_ControllerDetails[i].m_omStrLocation.empty()
+                                              ? CString(sg_ControllerDetails[i].m_omStrLocation.c_str())
+                                              : sGetConfiguredNeoVIRemoteIPAddress();
+                const bool bRemoteModeRetry = !oRemoteIpRetry.IsEmpty() && (icsneoOpenRemoteNeoDevice != nullptr);
+                CStringA remoteIpRetryA(oRemoteIpRetry);
+                if (bRemoteModeRetry)
+                {
+                    (*icsneoOpenRemoteNeoDevice)(const_cast<char*>(remoteIpRetryA.GetString()), &sg_ndNeoToOpen[i], &(m_anhObject[i][0]), m_ucNetworkID, 0);
+                }
+                else
+                {
+                    (*icsneoOpenNeoDevice)(&sg_ndNeoToOpen[i], &(m_anhObject[i][0]), m_ucNetworkID, 1, 0);
+                }
 
                 /* Checking return value of this function is not important
                 because GetConfig function (called to check for the hardware
@@ -2173,6 +2435,16 @@ HRESULT GetICS_neoVI_APIFuncPtrs(void)
         if (nullptr == icsneoOpenNeoDevice)
         {
             unResult = unResult | (1<<1);
+        }
+        icsneoOpenRemoteNeoDevice = (OPENREMOTEDEVICE) GetProcAddress(sg_hDll, "icsneoOpenRemoteNeoDevice");
+        if (nullptr == icsneoOpenRemoteNeoDevice)
+        {
+            unResult = unResult | (1<<18);
+        }
+        icsneoFindRemoteNeoDevices = (FINDREMOTEDEVICES) GetProcAddress(sg_hDll, "icsneoFindRemoteNeoDevices");
+        if (nullptr == icsneoFindRemoteNeoDevices)
+        {
+            unResult = unResult | (1<<19);
         }
         //Check3
         icsneoClosePort  = (CLOSEPORT) GetProcAddress(sg_hDll, "icsneoClosePort");
@@ -3159,8 +3431,6 @@ HRESULT CDIL_CAN_ICSNeoVI::CAN_ManageMsgBuf(BYTE bAction, DWORD ClientID, CBaseC
  */
 HRESULT CDIL_CAN_ICSNeoVI::CAN_LoadDriverLibrary(void)
 {
-    USES_CONVERSION;
-
     HRESULT hResult = S_OK;
 
     if (sg_hDll != nullptr)
@@ -3170,21 +3440,25 @@ HRESULT CDIL_CAN_ICSNeoVI::CAN_LoadDriverLibrary(void)
 
     if (S_OK == hResult)
     {
-        //Load the version i.e icsneo40.dll
-        sg_hDll = LoadLibrary("icsneo40.dll");
-        if (sg_hDll == nullptr)
+        CString oLoadedPath;
+        if (!bLoadNeoViRuntimeDll(sg_hDll, oLoadedPath))
         {
+            vSetNeoViError("neoVI driver disabled: Intrepid SDK/runtime not found");
             hResult = ERR_LOAD_DRIVER;
         }
-
-        if (sg_hDll != nullptr)
+        else
         {
             int nResult = GetICS_neoVI_APIFuncPtrs();
             if (nResult != 0)
             {
                 // Log list of the function pointers non-retrievable
                 // TO DO: specific information on failure in getting function pointer
+                vSetNeoViError("neoVI driver runtime initialization failed");
                 hResult = ERR_LOAD_DRIVER;
+            }
+            else
+            {
+                vSetNeoViError("neoVI driver runtime loaded successfully");
             }
         }
     }
