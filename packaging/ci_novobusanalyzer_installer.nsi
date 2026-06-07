@@ -9,10 +9,12 @@ RequestExecutionLevel admin
 !define MUI_ICON "..\Sources\BUSMASTER\Application\Res\novobusanalyzer.ico"
 !define MUI_UNICON "..\Sources\BUSMASTER\Application\Res\Uninstaller.ico"
 
-Page welcome
-Page directory
-Page instfiles
-UninstPage instfiles
+!insertmacro MUI_PAGE_WELCOME
+!insertmacro MUI_PAGE_DIRECTORY
+!insertmacro MUI_PAGE_INSTFILES
+!insertmacro MUI_UNPAGE_CONFIRM
+!insertmacro MUI_UNPAGE_INSTFILES
+!insertmacro MUI_LANGUAGE English
 
 Section "NovoBusAnalyzer" SEC_MAIN
   SetOutPath "$INSTDIR"
