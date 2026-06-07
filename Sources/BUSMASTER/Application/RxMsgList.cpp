@@ -64,6 +64,11 @@ CRxMsgList::CRxMsgList()
                            _("Courier"));
 }
 
+void CRxMsgList::PreSubclassWindow()
+{
+    CFlickerFreeListCtrl::PreSubclassWindow();
+}
+
 /**********************************************************************************
 Function Name   :   ~CRxMsgList
 Input(s)        :   -
@@ -383,11 +388,19 @@ void CRxMsgList::OnVScroll(UINT nSBCode, UINT nPos, CScrollBar* pScrollBar)
     {
         AfxBeginThread(UpDateThread, (LPVOID)this);
         CFlickerFreeListCtrl::OnVScroll(nSBCode, nPos, pScrollBar);
+        if (m_hParent != nullptr)
+        {
+            ::SendMessage(m_hParent, WM_SETFOCUS_MSGWND_LIST, (WPARAM)GetTopIndex(), (LPARAM)GetSelectionMark());
+        }
         return;
     }
     ::SendMessage( m_hParent, WM_UPDATE_TREE_ITEMS_POS, 0, 0);
     RedrawWindow();
     CFlickerFreeListCtrl::OnVScroll(nSBCode, nPos, pScrollBar);
+    if (m_hParent != nullptr)
+    {
+        ::SendMessage(m_hParent, WM_SETFOCUS_MSGWND_LIST, (WPARAM)GetTopIndex(), (LPARAM)GetSelectionMark());
+    }
 }
 
 /*******************************************************************************
@@ -407,6 +420,10 @@ BOOL CRxMsgList::OnMouseWheel(UINT /*nFlags*/, short /*zDelta*/, CPoint /*pt*/)
     if ( bInterpret )
     {
         AfxBeginThread(UpDateThread, (LPVOID)this);
+    }
+    if (m_hParent != nullptr)
+    {
+        ::SendMessage(m_hParent, WM_SETFOCUS_MSGWND_LIST, (WPARAM)GetTopIndex(), (LPARAM)GetSelectionMark());
     }
     return FALSE;
 }
@@ -1046,23 +1063,6 @@ LRESULT CRxMsgList::OnInsertColumn(WPARAM wParam, LPARAM lParam)
     }
 
     return lRet;
-}
-
-/*******************************************************************************
-  Function Name  : PreSubclassWindow
-  Input(s)       : -
-  Output         : -
-  Functionality  : Calls the PreSubclassWindow() of base class.
-  Member of      : CRxMsgList
-  Author(s)      : Arunkumar K
-  Date Created   : 20-05-2010
-  Modifications  :
-*******************************************************************************/
-void CRxMsgList::PreSubclassWindow()
-{
-    // TODO: Add your specialized code here and/or call the base class
-
-    CFlickerFreeListCtrl::PreSubclassWindow();
 }
 
 /*******************************************************************************
