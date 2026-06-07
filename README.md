@@ -86,8 +86,9 @@ Current user workflow:
 1. Install the Intrepid neoVI runtime on the PC.
 2. Connect the neoVI hardware to Ethernet.
 3. Open NovoBusAnalyzer.
-4. Select `IntrepidCS neoVI` as the CAN hardware.
-5. Open the neoVI configuration dialog and use `Discover...` to scan for
+4. Go to the CAN tab, then `Driver Selection`, choose `IntrepidCS neoVI`,
+   open `Channel Configuration` / `Configure`, and click `Discover...`.
+5. Use `Discover...` to scan for
    local USB-attached devices, discover remote Ethernet devices, or enter a
    manual IP address as a fallback.
 6. Save the selected device/IP if desired, then go online and monitor CAN
